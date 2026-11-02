@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Runtime PID lock written by serve.py
+.server.lock
+
+# User annotation projects (frames, videos, annotations) are generated locally
+projects/*
+!projects/.keep

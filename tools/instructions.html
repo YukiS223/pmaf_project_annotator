@@ -1,0 +1,191 @@
+<!doctype html>
+<!-- Source of INSTRUCTIONS.pdf. Regenerate with:
+     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless \
+       --no-pdf-header-footer --print-to-pdf=../INSTRUCTIONS.pdf instructions.html -->
+<html lang="en"><head><meta charset="utf-8"><title>PMAF Annotator — Instructions</title>
+<style>
+  @page { size: A4; margin: 13mm 15mm; }
+  * { box-sizing: border-box; }
+  body { font: 9.5pt/1.45 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+         color: #1a1d26; margin: 0; -webkit-print-color-adjust: exact; }
+  h1 { font-size: 16pt; margin: 0 0 2pt; }
+  .tagline { color: #555; margin: 0 0 10pt; }
+  h2 { font-size: 11.5pt; margin: 12pt 0 4pt; padding-bottom: 2pt;
+       border-bottom: 1.5pt solid #2b6e4f; }
+  p, ul, ol { margin: 4pt 0; }
+  ul, ol { padding-left: 16pt; }
+  li { margin: 2.5pt 0; }
+  kbd { display: inline-block; min-width: 11pt; text-align: center;
+        font: bold 8.5pt "SF Mono", Consolas, monospace; background: #eef2ee;
+        border: 0.75pt solid #b9c4bb; border-bottom-width: 2pt; border-radius: 3pt;
+        padding: 0 3pt; }
+  code { font: 8.5pt "SF Mono", Consolas, monospace; background: #f2f2f4;
+         padding: 0 2pt; border-radius: 2pt; }
+  table { border-collapse: collapse; width: 100%; margin: 5pt 0; }
+  th, td { border: 0.75pt solid #c8cdd4; padding: 2.5pt 5pt; text-align: left;
+           vertical-align: top; }
+  th { background: #e9efeb; font-size: 9pt; }
+  .note { background: #f4f7f4; border-left: 3pt solid #2b6e4f; padding: 4pt 8pt;
+          margin: 6pt 0; }
+  .avoid-break { break-inside: avoid; }
+  .footer { margin-top: 14pt; padding-top: 5pt; border-top: 0.75pt solid #c8cdd4;
+            color: #666; font-size: 8.5pt; }
+</style></head><body>
+
+<h1>PMAF Annotator — Instructions</h1>
+<p class="tagline">Local tool for labeling auroral forms in all-sky video with per-frame
+masks and stable track IDs. Everything runs offline on this computer — nothing is uploaded.</p>
+
+<h2>1&ensp;Start the tool</h2>
+<ul>
+  <li><b>macOS</b> (Apple silicon): first launch — <b>right-click
+      <code>START_HERE.command</code> → Open → Open</b>. Afterwards a normal
+      double-click works.</li>
+  <li><b>Windows</b>: double-click <code>START_HERE.exe</code>. If SmartScreen
+      objects: <i>More info → Run anyway</i>.</li>
+  <li>Your browser opens <code>http://127.0.0.1:8798/</code> (go there manually if not).
+      Use <b>Chrome or Edge</b>. Keep the terminal/console window open — closing it
+      stops the tool.</li>
+  <li>Run only one copy at a time; a second launch refuses to start.</li>
+</ul>
+
+<h2>2&ensp;Create a project from a video</h2>
+<p>On the home screen, <b>drop an AVI/MP4</b> onto the upload box, or click
+<b>Prepare</b> next to a video the tool found beside its folder. Preparation extracts
+every frame and reads the burned-in UT clock (2–6&nbsp;minutes and ~2&nbsp;GB of disk
+per 1-hour clip). When it says <i>ready</i>, click <b>Annotate</b>.</p>
+
+<h2>3&ensp;The annotation loop</h2>
+<ol>
+  <li><kbd>N</kbd> — create a track. <b>One track = one physical form</b>; its ID
+      follows it across frames.</li>
+  <li><b>Circle the form</b>: hold the mouse button and trace loosely around it;
+      release to close the outline. Drag inside the outline to move it; drawing
+      again (starting outside it) replaces it.</li>
+  <li><kbd>S</kbd> — <b>Snap</b>: fits a pixel mask to the bright aurora <b>inside
+      your outline</b> (never grows beyond it). Move the threshold slider — the mask
+      updates live; fix details with the brush (<kbd>B</kbd> add, <kbd>X</kbd> erase).</li>
+  <li><kbd>A</kbd> — <b>Accept &amp; advance</b>: stores the mask, moves to the next
+      frame, copies the outline forward and shows a <b>preview</b> snap (dashed
+      outline, softer mask). Previews are never saved — adjust, then <kbd>A</kbd>
+      again. <kbd>Z</kbd> discards a preview or an unfinished edit.</li>
+  <li><kbd>V</kbd> — the form is not visible on this frame (<i>absent</i>).</li>
+  <li><kbd>Q</kbd> — whole frame unusable (clouds, glare, corruption); press again to undo.</li>
+</ol>
+<ul>
+  <li><b>Sky views</b>: <kbd>D</kbd> toggles <b>Original / Enhanced</b>. Enhanced
+      flattens twilight/sunlight gradients and preserves faint aurora — label in
+      whichever view shows the form best. Views only change what you see; masks always
+      snap to the underlying image data.</li>
+  <li>Editing an accepted frame (moving its outline or brushing) opens a preview
+      copy; the stored mask is untouched until you press <kbd>A</kbd> to re-accept.</li>
+  <li>A track created by mistake: <i>Delete track…</i> in the right panel.</li>
+  <li>Press <kbd>?</kbd> in the app for the full keyboard map; <kbd>H</kbd> hides
+      masks for a blink test.</li>
+</ul>
+
+<h2>4&ensp;Labeling rules</h2>
+<ul>
+  <li><b>Do not label</b>: the quasi-static background oval/arc a form detaches from,
+      airglow patches, moonlit clouds, city glow, or forms that brighten but never move.</li>
+  <li><b>Mask boundary</b>: cover pixels <b>visibly brighter than the local
+      background</b> that belong to the form — the clearly-emitting region, not the
+      faintest halo. Consistency beats single-frame perfection: use similar thresholds
+      for similar forms and keep the propagated preview's threshold unless it is
+      visibly wrong.</li>
+  <li><b>Faint forms</b>: judge in the Enhanced view; blink against neighbouring
+      frames (arrow keys) — real forms move coherently, noise does not.</li>
+  <li>Forms crossing the sky-circle edge: label what is inside (clipped automatically).</li>
+  <li><b>Track life</b>: start at the first frame where the form is distinctly
+      identifiable; use <i>Starts here</i> to mark all earlier frames absent in one
+      click. After its last frame, press <i>Ends here</i>. Both are undoable from the
+      events list — undoing <i>Ends here</i> lets the track continue.</li>
+  <li><b>Reappearance</b>: same track if position and motion are clearly continuous
+      and the gap is under ~30&nbsp;s; otherwise a new track.</li>
+  <li><b>Split</b>: the part continuing the original motion keeps the track; create a
+      new track for the other part. <b>Merge</b>: keep the larger/brighter track and
+      press <i>Ends here</i> on the other. Masks never overlap — give contested pixels
+      to the form they most plausibly belong to.</li>
+  <li><b>Density</b>: annotate every frame during onset, rapid motion, splits, merges
+      and disappearance. In stable spans you may set the advance step to 2, but
+      skipped frames stay unreviewed and are not exported — fill them in if dense
+      labels are needed.</li>
+  <li><b>Timing</b>: frames whose HUD shows <code>[interp]</code> or
+      <code>[nominal]</code> have reconstructed clock times — annotate normally, but
+      report clips with many of them.</li>
+  <li>When a rule is ambiguous, ask the PI rather than guessing.</li>
+</ul>
+
+<div class="avoid-break">
+<p><b>Frame states</b> (per track):</p>
+<table>
+  <tr><th>state</th><th>meaning</th><th>exported?</th></tr>
+  <tr><td>accepted</td><td>you reviewed this mask on this frame</td><td>yes (mask)</td></tr>
+  <tr><td>absent</td><td>you reviewed the frame; the form is not visible</td><td>yes (true negative)</td></tr>
+  <tr><td>(preview)</td><td>machine suggestion / unfinished edit — never saved</td><td>no</td></tr>
+  <tr><td>unreviewed</td><td>never looked at</td><td>no</td></tr>
+  <tr><td>bad frame</td><td>whole frame unusable</td><td>no</td></tr>
+</table>
+<p class="note">A frame is exported only when <b>every</b> track on it is accepted or
+absent — <i>Starts here</i> / <i>Ends here</i> is what makes frames exportable.</p>
+</div>
+
+<h2>5&ensp;Saving and quality</h2>
+<ul>
+  <li>Everything <b>autosaves continuously</b> (indicator in the top bar) — no export
+      needed to keep your work. Relaunching the tool reopens your project on the exact
+      frame, track and view you left.</li>
+  <li>All work lives in <code>projects/</code> — back that folder up. Time-bucketed
+      safety copies are kept in <code>projects/&lt;name&gt;/backups/</code>; after a
+      crash, copy the newest over <code>annotations.json</code>.</li>
+</ul>
+<p><b>Checklist before export</b>:</p>
+<ul>
+  <li>Timeline lanes: no dark (unreviewed) gaps inside each track's life.</li>
+  <li>Blink test (<kbd>H</kbd>) on a few random accepted frames: the mask hugs the form.</li>
+  <li>No track with 0 accepted frames; <i>Ends here</i> recorded where tracks die or merge.</li>
+</ul>
+
+<h2>6&ensp;Exporting labels (for the training pipeline)</h2>
+<p>Click <b>Export…</b> in the toolbar. Export is <b>fail-closed</b>: it validates
+everything and writes either a complete dataset or a <code>.FAILED</code> folder with
+the report. Output in <code>projects/&lt;name&gt;/export/&lt;timestamp&gt;/</code>:</p>
+<table>
+  <tr><th>file</th><th>contents</th></tr>
+  <tr><td><code>train_cocovis.json</code></td><td>COCO-VIS (YouTube-VIS style): per-track
+      per-frame RLE masks, boxes, areas; original frame indices and per-frame UT times</td></tr>
+  <tr><td><code>masks/%06d.png</code></td><td>uint16 instance-ID maps (0 = background,
+      value = track id)</td></tr>
+  <tr><td><code>lut.json</code></td><td>pixel value → track uuid/name/color</td></tr>
+  <tr><td><code>audit.json</code>, <code>report.json</code>, <code>checksums.txt</code></td>
+      <td>full annotation record, validator results, sha256 sums</td></tr>
+</table>
+<ul>
+  <li><code>null</code> segmentation = reviewed and absent (a true negative). Frames
+      <b>missing</b> from the export were not reviewed — never treat them as negatives.</li>
+  <li><code>file_names</code> resolve against <code>videos[].image_root</code> (the
+      project folder; frame PNGs are not copied into the export).</li>
+  <li>Group train/val splits by <code>videos[].night_id</code> — clips from the same
+      night are correlated and must stay in one split.</li>
+  <li>True frame cadence is ~1.0145&nbsp;s and drifts — use the exported UT
+      timestamps, never frame index × 1&nbsp;s.</li>
+</ul>
+
+<h2>7&ensp;Troubleshooting</h2>
+<table>
+  <tr><th>symptom</th><th>fix</th></tr>
+  <tr><td>macOS: “cannot be opened because…”</td><td>Right-click → Open (first launch only)</td></tr>
+  <tr><td>Windows SmartScreen blocks the launcher</td><td>More info → Run anyway (unsigned exe; its source is in <code>tools/launcher/</code>)</td></tr>
+  <tr><td>“FFmpeg not found” banner</td><td>bundled binary stripped by antivirus/quarantine — reinstall the package, or install ffmpeg on PATH</td></tr>
+  <tr><td>prepare fails with “low disk”</td><td>free ~2&nbsp;GB per 1-hour clip, retry</td></tr>
+  <tr><td>browser did not open</td><td>go to <code>http://127.0.0.1:8798/</code> manually</td></tr>
+  <tr><td>save indicator shows “conflict”</td><td>another tab has the project open — close one, reload</td></tr>
+  <tr><td>lost annotations after a crash</td><td>copy <code>projects/&lt;name&gt;/backups/&lt;newest&gt;</code> over <code>annotations.json</code></td></tr>
+</table>
+
+<p class="footer">Bundled ffmpeg: FFmpeg 7.1 GPL build from the imageio-ffmpeg project,
+unmodified, for internal research use. Linux / Intel-Mac: install python3 and ffmpeg,
+then run <code>python3 serve.py</code>. The Windows launcher's source is in
+<code>tools/launcher/</code> (rebuild with mingw-w64).</p>
+
+</body></html>

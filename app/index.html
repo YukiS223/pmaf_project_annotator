@@ -1,0 +1,2212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PMAF Annotator</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  --bg: #14161a; --panel: #1d2026; --panel2: #23262e; --line: #33363f;
+  --text: #e6e8ee; --dim: #9aa0ae; --accent: #4da3ff; --ok: #43c05c;
+  --warn: #e0a63c; --err: #e05c5c;
+}
+* { box-sizing: border-box; margin: 0; }
+body { background: var(--bg); color: var(--text);
+  font: 14px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif;
+  height: 100vh; overflow: hidden; }
+button { background: var(--panel2); color: var(--text); border: 1px solid var(--line);
+  border-radius: 6px; padding: 5px 10px; cursor: pointer; font: inherit; }
+button:hover { border-color: var(--accent); }
+button.primary { background: #275a8f; border-color: #3a7bbf; }
+button:disabled { opacity: .45; cursor: default; }
+input[type=text], input[type=number] { background: var(--panel2); color: var(--text);
+  border: 1px solid var(--line); border-radius: 5px; padding: 4px 8px; font: inherit; }
+input[type=range] { accent-color: var(--accent); }
+.badge { display: inline-block; border-radius: 4px; padding: 0 6px; font-size: 11px;
+  font-weight: 600; letter-spacing: .02em; }
+#home { padding: 32px; max-width: 900px; margin: 0 auto; height: 100vh; overflow: auto; }
+#home h1 { font-size: 22px; margin-bottom: 4px; }
+#home .sub { color: var(--dim); margin-bottom: 18px; }
+.card { background: #1b1e24; border: 1px solid var(--line); border-radius: 10px;
+  padding: 14px 16px; margin: 10px 0; }
+.card h3 { font-size: 15px; margin-bottom: 6px; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.grow { flex: 1; }
+#drop { border: 2px dashed var(--line); border-radius: 10px; padding: 22px;
+  text-align: center; color: var(--dim); margin: 10px 0; }
+#drop.over { border-color: var(--accent); color: var(--text); }
+#annotate { display: none; height: 100vh; flex-direction: column; }
+#topbar { display: flex; align-items: center; gap: 10px; padding: 6px 12px;
+  background: #191c22; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+#main { flex: 1; display: flex; min-height: 0; }
+#sidebar { width: 250px; background: #191c22; border-right: 1px solid var(--line);
+  display: flex; flex-direction: column; min-height: 0; }
+#tracks { flex: 1; overflow: auto; padding: 8px; }
+.track { border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px;
+  margin-bottom: 7px; cursor: pointer; }
+.track.active { border-color: var(--accent); background: #20242c; }
+.track .dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block;
+  margin-right: 7px; vertical-align: -1px; }
+.track .nm { font-weight: 600; }
+.track .st { float: right; }
+#canvaswrap { flex: 1; position: relative; min-width: 0; background: #000; }
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; }
+#hud { position: absolute; left: 10px; top: 8px; background: rgba(10,12,16,.72);
+  border-radius: 8px; padding: 6px 10px; font-size: 12.5px; pointer-events: none; }
+#toasts { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none; }
+.toast { background: rgba(20,24,30,.94); border: 1px solid var(--line);
+  border-radius: 8px; padding: 7px 14px; font-size: 13px; }
+.toast.warn { border-color: var(--warn); }
+.toast.err { border-color: var(--err); }
+#rightpanel { width: 232px; background: #191c22; border-left: 1px solid var(--line);
+  padding: 10px; overflow: auto; font-size: 13px; }
+#rightpanel h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--dim); margin: 12px 0 6px; }
+#rightpanel h4:first-child { margin-top: 0; }
+.ctl { margin: 6px 0; }
+.ctl label { display: block; color: var(--dim); font-size: 12px; }
+.ctl input[type=range] { width: 100%; }
+#bottombar { background: #191c22; border-top: 1px solid var(--line); padding: 6px 12px 10px; }
+#timeline { width: 100%; display: block; cursor: pointer; border-radius: 4px; }
+#framerow { display: flex; gap: 10px; align-items: center; margin-bottom: 4px; }
+#framerow input[type=range] { flex: 1; }
+kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-width: 2px;
+  border-radius: 4px; padding: 0 5px; font: 12px ui-monospace, monospace; }
+#help { position: fixed; inset: 0; background: rgba(8,10,14,.82); display: none;
+  z-index: 50; overflow: auto; }
+#help .inner { max-width: 760px; margin: 40px auto; background: #1b1e24;
+  border: 1px solid var(--line); border-radius: 12px; padding: 24px 28px; }
+#help table { border-collapse: collapse; width: 100%; }
+#help td { padding: 3px 8px 3px 0; vertical-align: top; }
+#savestat { font-size: 12px; color: var(--dim); min-width: 74px; text-align: center; }
+#savestat.err { color: var(--err); }
+.mono { font-family: ui-monospace, monospace; }
+dialog { background: #1d2026; color: var(--text); border: 1px solid var(--line);
+  border-radius: 10px; padding: 18px 20px; max-width: 560px; }
+dialog::backdrop { background: rgba(8,10,14,.7); }
+progress { width: 100%; height: 8px; }
+</style>
+</head>
+<body>
+
+<!-- ======================= HOME ======================= -->
+<div id="home">
+  <h1>PMAF Annotator</h1>
+  <div class="sub">Label Poleward Moving Auroral Forms in all-sky video — per-frame
+    masks with stable track IDs.</div>
+  <div id="health" class="card" style="display:none"></div>
+  <div class="card">
+    <h3>New project from a video (AVI / MP4)</h3>
+    <div id="drop">Drop a video file here, or
+      <button id="pickbtn">choose a file…</button>
+      <input type="file" id="filepick" accept=".avi,.mp4,.mov,.mkv" style="display:none">
+    </div>
+    <div id="scanlist"></div>
+    <div id="prepprog" style="display:none">
+      <div class="row"><div class="grow" id="preptext"></div></div>
+      <progress id="prepbar" max="100" value="0"></progress>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Projects</h3>
+    <div id="projlist" class="sub">loading…</div>
+  </div>
+  <div class="sub">Docs: INSTRUCTIONS.pdf in the package folder.
+    Press <kbd>?</kbd> inside the annotator for keys.</div>
+</div>
+
+<!-- ======================= ANNOTATE ======================= -->
+<div id="annotate">
+  <div id="topbar">
+    <button id="backbtn" title="back to projects">&#8592; Projects</button>
+    <b id="projname" class="mono"></b>
+    <span id="savestat">saved</span>
+    <span class="grow"></span>
+    <span style="color:var(--dim);font-size:12px">tool:</span>
+    <button id="tool-draw" title="Circle around the form (E)">Circle (E)</button>
+    <button id="tool-brush" title="Brush add (B)">Brush +</button>
+    <button id="tool-erase" title="Brush erase (X)">Brush &minus;</button>
+    <button id="snapbtn" class="primary" title="Snap mask to aurora (S)">Snap (S)</button>
+    <span class="grow"></span>
+    <button id="exportbtn">Export…</button>
+    <button id="helpbtn" title="keyboard map (?)">?</button>
+  </div>
+  <div id="main">
+    <div id="sidebar">
+      <div style="padding:8px 8px 0"><button id="newtrack" style="width:100%">+ New PMAF track (N)</button></div>
+      <div id="tracks"></div>
+    </div>
+    <div id="canvaswrap">
+      <canvas id="cv"></canvas>
+      <div id="hud"></div>
+      <div id="toasts"></div>
+    </div>
+    <div id="rightpanel">
+      <h4>Review (active track)</h4>
+      <div class="row" style="gap:6px">
+        <button id="acceptbtn" class="primary grow" title="Accept mask & advance">Accept (A) &rarr;</button>
+      </div>
+      <div class="row" style="gap:6px;margin-top:6px">
+        <button id="absentbtn" class="grow" title="Not visible on this frame">Absent (V) &rarr;</button>
+        <button id="clearbtn" title="Clear this frame's record (Backspace)">Clear (&#9003;)</button>
+      </div>
+      <div class="row" style="gap:6px;margin-top:6px">
+        <button id="badbtn" class="grow" title="Whole frame unusable: clouds, glare, corruption. Press again to undo.">Bad frame (Q)</button>
+      </div>
+      <h4>Snap</h4>
+      <div class="ctl"><label>Threshold <span id="hival" class="mono"></span></label>
+        <input type="range" id="hi" min="0.2" max="0.95" step="0.01" value="0.55"></div>
+      <h4>Display</h4>
+      <div class="ctl"><label>Sky view (D toggles)</label>
+        <select id="viewmode">
+          <option value="original">Original</option>
+          <option value="enhanced">Enhanced (flatten sky)</option>
+        </select></div>
+      <div class="ctl"><label>Mask opacity (O)</label>
+        <input type="range" id="opacity" min="0" max="1" step="0.05" value="0.45"></div>
+      <div class="ctl"><label>Brush size <span id="brval" class="mono"></span> ( [ ] )</label>
+        <input type="range" id="brush" min="2" max="40" step="1" value="9"></div>
+      <div class="ctl"><label>Advance step</label>
+        <select id="stride"><option>1</option><option>2</option><option>5</option><option>10</option></select></div>
+      <h4>Frame</h4>
+      <div id="frameinfo" style="font-size:12.5px;color:var(--dim)"></div>
+      <h4>Track lifecycle</h4>
+      <div class="row" style="gap:6px">
+        <button id="ev-start" class="grow" title="The PMAF first appears at this frame: all earlier frames are marked absent for this track (undoable)">Starts here</button>
+        <button id="ev-end" class="grow" title="The PMAF has ended at this frame: all later frames are marked absent for this track (undoable)">Ends here</button>
+      </div>
+      <div id="events" style="font-size:12.5px;margin-top:6px"></div>
+      <div class="row" style="margin-top:10px">
+        <button id="deltrack" style="border-color:var(--err);color:var(--err)"
+          title="delete this track and all its frame records">Delete track&hellip;</button>
+      </div>
+    </div>
+  </div>
+  <div id="bottombar">
+    <div id="framerow">
+      <button id="prevb" title="&larr;">&#9664;</button>
+      <button id="nextb" title="&rarr;">&#9654;</button>
+      <input type="range" id="seek" min="0" max="0" value="0">
+      <span class="mono" id="fcount"></span>
+      <input type="number" id="goto" style="width:84px" placeholder="go to">
+    </div>
+    <canvas id="timeline" height="10"></canvas>
+  </div>
+</div>
+
+<!-- ======================= HELP ======================= -->
+<div id="help"><div class="inner">
+  <h2 style="margin-bottom:10px">How to annotate</h2>
+  <ol style="margin:0 0 14px 20px">
+    <li>Create a track per PMAF (<kbd>N</kbd>). The track keeps its ID for the
+      whole life of that PMAF across frames.</li>
+    <li>Circle the form (<kbd>E</kbd>): hold the mouse button and trace loosely
+      around it; release to close the outline. Drag inside the outline to move
+      it; drawing again (starting outside it) replaces it.</li>
+    <li><kbd>S</kbd> snaps a pixel mask to the bright aurora inside your
+      outline (the mask never grows beyond it). Adjust the threshold slider —
+      the preview updates live; fix details with the brush (<kbd>B</kbd> add,
+      <kbd>X</kbd> erase).</li>
+    <li><kbd>A</kbd> accepts the visible mask and advances — the tool copies the
+      outline forward and shows a <i>preview</i> snap, which you adjust and
+      accept. Previews are never saved: only what you explicitly Accept (or
+      mark Absent) is stored. Never accept a preview you have not looked at.</li>
+    <li>If the PMAF is not visible on a frame, press <kbd>V</kbd> (absent).
+      A frame exports only when every track is accepted or absent on it.
+      Use <i>Starts here</i> / <i>Ends here</i> to mark everything before /
+      after the PMAF's life absent in one click (both undoable).</li>
+    <li>Save is automatic — always, even without exporting. Relaunching the
+      app reopens your project exactly where you left off.</li>
+  </ol>
+  <table>
+  <tr><td><kbd>&larr;</kbd> <kbd>&rarr;</kbd></td><td>previous / next frame (<kbd>Shift</kbd> = &times;10)</td></tr>
+  <tr><td><kbd>A</kbd></td><td>accept visible mask &amp; advance (then auto-preview)</td></tr>
+  <tr><td><kbd>V</kbd></td><td>mark absent &amp; advance</td></tr>
+  <tr><td><kbd>P</kbd></td><td>preview a copy of the nearest accepted mask here</td></tr>
+  <tr><td><kbd>S</kbd></td><td>snap mask inside the drawn outline</td></tr>
+  <tr><td><kbd>E</kbd> / <kbd>B</kbd> / <kbd>X</kbd></td><td>circle the form / brush add / brush erase</td></tr>
+  <tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>brush size</td></tr>
+  <tr><td><kbd>Q</kbd></td><td>toggle bad frame (clouds/glare/corrupt)</td></tr>
+  <tr><td><kbd>Backspace</kbd></td><td>clear active track's record on this frame</td></tr>
+  <tr><td><kbd>Z</kbd> / <kbd>Y</kbd></td><td>undo / redo (per frame)</td></tr>
+  <tr><td><kbd>1</kbd>&hellip;<kbd>9</kbd>, <kbd>N</kbd></td><td>select / create track</td></tr>
+  <tr><td><kbd>D</kbd></td><td>toggle sky view: Original / Enhanced</td></tr>
+  <tr><td><kbd>O</kbd></td><td>cycle mask opacity</td></tr>
+  <tr><td>hold <kbd>H</kbd></td><td>hide overlays (blink test)</td></tr>
+  <tr><td>wheel / drag-space</td><td>zoom (at cursor) / pan &mdash; view persists across frames</td></tr>
+  <tr><td><kbd>G</kbd></td><td>go to frame&hellip;</td></tr>
+  </table>
+  <p style="margin-top:14px"><button onclick="document.getElementById('help').style.display='none'">Close (Esc)</button></p>
+</div></div>
+
+<dialog id="exportdlg"></dialog>
+
+<script>
+"use strict";
+/* =============================== utilities =============================== */
+const $ = id => document.getElementById(id);
+const W = 608;  // canonical frame size; real size read from manifest
+let FW = 608, FH = 608;
+const clamp = (v, a, b) => v < a ? a : (v > b ? b : v);
+const PALETTE = ["#ff5c5c","#4da3ff","#43c05c","#e0a63c","#c66ef0","#3fd2c7",
+                 "#f08fb5","#a3ff4d","#ff9a3c","#7f8cff"];
+function toast(msg, cls) {
+  const t = document.createElement("div");
+  t.className = "toast" + (cls ? " " + cls : "");
+  t.textContent = msg;
+  $("toasts").appendChild(t);
+  setTimeout(() => t.remove(), cls === "err" ? 6000 : 3200);
+}
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  let body = null;
+  try { body = await r.json(); } catch (e) { /* non-json */ }
+  if (!r.ok) {
+    const msg = (body && body.error) || (r.status + " " + r.statusText);
+    const err = new Error(msg); err.status = r.status; err.body = body;
+    throw err;
+  }
+  return body;
+}
+
+/* ------------------------------- RLE codec ------------------------------- */
+/* Mirrors tools/rle.py: "<w>x<h>:" + base36 runs '.'-joined, row-major,
+   alternating background,foreground,... starting with background. */
+function rleEncode(mask, w, h) {
+  const runs = [];
+  let val = 0, len = 0;
+  for (let i = 0; i < w * h; i++) {
+    const v = mask[i] ? 1 : 0;
+    if (v === val) len++;
+    else { runs.push(len); val = v; len = 1; }
+  }
+  runs.push(len);
+  return w + "x" + h + ":" + runs.map(n => n.toString(36)).join(".");
+}
+function rleDecode(s) {
+  const ci = s.indexOf(":");
+  const [w, h] = s.slice(0, ci).split("x").map(Number);
+  const mask = new Uint8Array(w * h);
+  let pos = 0, val = 0;
+  if (ci + 1 < s.length) {
+    for (const tok of s.slice(ci + 1).split(".")) {
+      const n = parseInt(tok, 36);
+      if (val) mask.fill(1, pos, pos + n);
+      pos += n;
+      val ^= 1;
+    }
+  }
+  if (pos !== w * h) throw new Error("bad RLE length");
+  return { mask, w, h };
+}
+
+/* =============================== app state =============================== */
+let manifest = null, doc = null, projName = null, projectGen = 0;
+let cur = { frame: 0, trackId: null, tool: "draw" };
+let view = { zoom: 1, panX: 0, panY: 0, fitted: false };
+let dirty = new Set(), tracksDirty = false, saveTimer = null, saving = false;
+let undoStacks = new Map();   // frame -> {undo: [], redo: []}
+const imgCache = new Map();   // frame -> {img, ok}
+let bgImages = [];            // ImageData per segment
+let maskCache = { frame: -1, rev: null, masks: new Map() }; // tid -> Uint8Array
+let hidden = false;           // hold-H blink
+
+function trackById(id) { return doc.tracks.find(t => t.id === id); }
+function frameRec(f) { return doc.frames[String(f)]; }
+function trackRec(f, tid) {
+  const fr = frameRec(f);
+  return fr && fr.tracks ? fr.tracks[String(tid)] : undefined;
+}
+function ensureFrame(f) {
+  const k = String(f);
+  if (!doc.frames[k]) doc.frames[k] = { tracks: {} };
+  if (!doc.frames[k].tracks) doc.frames[k].tracks = {};
+  return doc.frames[k];
+}
+function setTrackRec(f, tid, rec) {
+  const fr = ensureFrame(f);
+  if (rec === undefined) delete fr.tracks[String(tid)];
+  else fr.tracks[String(tid)] = rec;
+  if (!Object.keys(fr.tracks).length && !fr.bad) delete doc.frames[String(f)];
+  markDirty(f);
+}
+
+/* ------------------------------ persistence ------------------------------ */
+function markDirty(f) {
+  dirty.add(f);
+  scheduleSave();
+  drawTimeline();
+}
+function scheduleSave() {
+  $("savestat").textContent = "…";
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(flushSave, 1200);
+}
+let savePromise = null;   // resolves when the CURRENT save request finishes
+async function saveSettled() {
+  /* wait until nothing is in flight AND nothing is dirty (or a save failed) */
+  for (let i = 0; i < 100; i++) {
+    if (savePromise) await savePromise;
+    if (!saving && !dirty.size && !tracksDirty) return true;
+    if ($("savestat").classList.contains("err")) return false;
+    await flushSave();
+  }
+  return false;
+}
+async function flushSave() {
+  if (saving) { scheduleSave(); return savePromise; }
+  if (!dirty.size && !tracksDirty) { $("savestat").textContent = "saved"; return; }
+  let done;
+  savePromise = new Promise(r => { done = r; });
+  saving = true;
+  /* swap the dirty set out: edits landing during the request re-populate
+     `dirty` and are never silently un-flagged by this save's ack */
+  const inFlight = dirty;
+  dirty = new Set();
+  const sentTracks = tracksDirty;
+  tracksDirty = false;
+  const payload = { base_rev: doc.rev, frames: {} };
+  for (const f of inFlight) {
+    const rec = doc.frames[String(f)];
+    payload.frames[String(f)] = rec === undefined ? null : rec;
+  }
+  if (sentTracks) payload.tracks = doc.tracks;
+  const body = JSON.stringify(payload);
+  $("savestat").textContent = "saving…";
+  $("savestat").classList.remove("err");
+  try {
+    const r = await api(`/api/annotations?name=${projName}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body });
+    doc.rev = r.rev;
+    $("savestat").textContent = dirty.size ? "…" : "saved";
+    if (dirty.size || tracksDirty) scheduleSave();
+  } catch (e) {
+    for (const f of inFlight) dirty.add(f);          // retain unsaved work
+    tracksDirty = tracksDirty || sentTracks;
+    $("savestat").classList.add("err");
+    if (e.status === 409) {
+      $("savestat").textContent = "conflict!";
+      toast("Save conflict — annotations changed outside this tab. " +
+            "Reload the page to continue.", "err");
+    } else {
+      $("savestat").textContent = "retrying";
+      setTimeout(flushSave, 4000);
+    }
+  } finally { saving = false; done(); savePromise = null; }
+}
+window.addEventListener("beforeunload", e => {
+  saveSession();
+  if (dirty.size || tracksDirty || saving) { flushSave(); e.preventDefault(); }
+});
+
+/* --------------------------------- undo --------------------------------- */
+function stacksFor(f) {
+  if (!undoStacks.has(f)) undoStacks.set(f, { undo: [], redo: [] });
+  return undoStacks.get(f);
+}
+function pushUndo(f) {
+  const s = stacksFor(f);
+  s.undo.push(JSON.stringify(doc.frames[String(f)] ?? null));
+  if (s.undo.length > 50) s.undo.shift();
+  s.redo.length = 0;
+}
+function doUndo(redo) {
+  if (!redo && pending) {
+    /* an unaccepted preview/edit anywhere: Z discards it first, so stored
+       records are never undone while a preview is dangling */
+    discardPending();
+    toast("preview discarded");
+    renderTracks();
+    render();
+    return;
+  }
+  const f = cur.frame, s = stacksFor(f);
+  const from = redo ? s.redo : s.undo, to = redo ? s.undo : s.redo;
+  if (!from.length) { toast(redo ? "nothing to redo" : "nothing to undo"); return; }
+  const before = doc.frames[String(f)];
+  to.push(JSON.stringify(before ?? null));
+  const snap = JSON.parse(from.pop());
+  if (snap === null) delete doc.frames[String(f)];
+  else doc.frames[String(f)] = snap;
+  invalidateMasks();
+  markDirty(f);
+  renderTracks();
+  render();
+}
+
+/* ============================ frame image cache ========================== */
+function frameURL(f) {
+  return `/p/${projName}/frames/${String(f).padStart(6, "0")}.png`;
+}
+function getImage(f) {
+  let e = imgCache.get(f);
+  if (e) return e;
+  const img = new Image();
+  e = { img, ok: false };
+  img.onload = () => { e.ok = true; if (f === cur.frame) render(); };
+  img.src = frameURL(f);
+  imgCache.set(f, e);
+  if (imgCache.size > 90) {          // LRU-ish eviction, keep near current
+    for (const k of imgCache.keys()) {
+      if (Math.abs(k - cur.frame) > 30) { imgCache.delete(k); }
+      if (imgCache.size <= 70) break;
+    }
+  }
+  return e;
+}
+function prefetch() {
+  const st = +($("stride").value || 1);
+  for (const d of [1, 2, 3, 4, 5]) {
+    if (cur.frame + d * st < manifest.video.nframes) getImage(cur.frame + d * st);
+    if (cur.frame - d * st >= 0) getImage(cur.frame - d * st);
+  }
+}
+function frameImageData(f) {
+  const e = getImage(f);
+  if (!e.ok) return null;
+  if (e.idata) return e.idata;
+  const oc = new OffscreenCanvas(FW, FH), o = oc.getContext("2d", { willReadFrequently: true });
+  o.drawImage(e.img, 0, 0);
+  e.idata = o.getImageData(0, 0, FW, FH);
+  return e.idata;
+}
+
+/* ================================ masks ================================= */
+function invalidateMasks() { maskCache.frame = -1; }
+function masksForFrame(f) {
+  if (maskCache.frame === f && maskCache.rev === doc.rev + dirty.size) return maskCache.masks;
+  const m = new Map();
+  const fr = frameRec(f);
+  if (fr && fr.tracks) {
+    for (const [tid, rec] of Object.entries(fr.tracks)) {
+      if (rec.rle) {
+        try { m.set(+tid, rleDecode(rec.rle).mask); }
+        catch (err) { console.error("RLE decode", f, tid, err); }
+      }
+    }
+  }
+  maskCache = { frame: f, rev: doc.rev + dirty.size, masks: m };
+  return m;
+}
+
+/* ====================== enhanced view (sky flattening) =================== */
+/* Per-frame SPATIAL background: coarse mesh (64px cells) -> per-cell p40
+   percentile per channel -> 3x3 cell median -> smooth bilinear upsample.
+   The model is too smooth (>=64px scale) to contain auroral arcs and has NO
+   temporal component, so faint aurora that persists for the whole clip can
+   never be absorbed into it (the failure mode of the temporal median).
+   Residual is asinh-stretched (linear near zero: faint-safe; compressive
+   for bright arcs) with per-frame auto-gain. Validated on the 2024-01-07
+   twilight clip (faint band at 13:33 UT) and the 2017-12-18 night event. */
+const ENH_MESH = 64, ENH_PCTL = 0.40, ENH_BIAS = 22;
+const SNAP_ALGO_VERSION = 2;   // v2: + spatial-mesh residual feature
+const SNAP_CONTAIN = 1.0;      // masks never grow beyond the drawn outline
+
+function meshBackground(data) {   /* data: Uint8ClampedArray RGBA */
+  const gh = Math.floor(FH / ENH_MESH), gw = Math.floor(FW / ENH_MESH);
+  const grid = new Float32Array(gh * gw * 3);
+  const hist = new Uint16Array(256);
+  for (let cy = 0; cy < gh; cy++) for (let cx = 0; cx < gw; cx++) {
+    for (let c = 0; c < 3; c++) {
+      hist.fill(0);
+      const y1 = cy === gh - 1 ? FH : (cy + 1) * ENH_MESH;
+      const x1 = cx === gw - 1 ? FW : (cx + 1) * ENH_MESH;
+      let n = 0;
+      for (let y = cy * ENH_MESH; y < y1; y++) {
+        let p = (y * FW + cx * ENH_MESH) * 4 + c;
+        for (let x = cx * ENH_MESH; x < x1; x++, p += 4) { hist[data[p]]++; n++; }
+      }
+      const target = n * ENH_PCTL;
+      let acc = 0, v = 0;
+      for (; v < 256; v++) { acc += hist[v]; if (acc >= target) break; }
+      grid[(cy * gw + cx) * 3 + c] = v;
+    }
+  }
+  /* 3x3 median across cells: rejects cells contaminated by bright aurora */
+  const med = new Float32Array(grid.length);
+  const buf = [];
+  for (let cy = 0; cy < gh; cy++) for (let cx = 0; cx < gw; cx++) {
+    for (let c = 0; c < 3; c++) {
+      buf.length = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const yy = clamp(cy + dy, 0, gh - 1), xx = clamp(cx + dx, 0, gw - 1);
+        buf.push(grid[(yy * gw + xx) * 3 + c]);
+      }
+      buf.sort((a, b) => a - b);
+      med[(cy * gw + cx) * 3 + c] = buf[4];
+    }
+  }
+  /* bilinear upsample to full resolution */
+  let bg = new Float32Array(FW * FH * 3);
+  for (let y = 0; y < FH; y++) {
+    const fy = clamp((y + 0.5) / ENH_MESH - 0.5, 0, gh - 1);
+    const y0 = Math.floor(fy), yb = Math.min(y0 + 1, gh - 1), wy = fy - y0;
+    for (let x = 0; x < FW; x++) {
+      const fx = clamp((x + 0.5) / ENH_MESH - 0.5, 0, gw - 1);
+      const x0 = Math.floor(fx), xb = Math.min(x0 + 1, gw - 1), wx = fx - x0;
+      const o = (y * FW + x) * 3;
+      for (let c = 0; c < 3; c++) {
+        bg[o + c] = med[(y0 * gw + x0) * 3 + c] * (1 - wy) * (1 - wx)
+                  + med[(y0 * gw + xb) * 3 + c] * (1 - wy) * wx
+                  + med[(yb * gw + x0) * 3 + c] * wy * (1 - wx)
+                  + med[(yb * gw + xb) * 3 + c] * wy * wx;
+      }
+    }
+  }
+  bg = boxBlur3(bg, 21);
+  bg = boxBlur3(bg, 21);
+  return bg;
+}
+function boxBlur3(a, r) {   /* separable box blur, 3-channel planar-in-RGB */
+  const out = new Float32Array(a.length);
+  const tmp = new Float32Array(a.length);
+  const w1 = 2 * r + 1;
+  for (let y = 0; y < FH; y++) {          // horizontal
+    for (let c = 0; c < 3; c++) {
+      let s = 0;
+      for (let x = -r; x <= r; x++) s += a[(y * FW + clamp(x, 0, FW - 1)) * 3 + c];
+      for (let x = 0; x < FW; x++) {
+        tmp[(y * FW + x) * 3 + c] = s / w1;
+        s += a[(y * FW + clamp(x + r + 1, 0, FW - 1)) * 3 + c]
+           - a[(y * FW + clamp(x - r, 0, FW - 1)) * 3 + c];
+      }
+    }
+  }
+  for (let x = 0; x < FW; x++) {          // vertical
+    for (let c = 0; c < 3; c++) {
+      let s = 0;
+      for (let y = -r; y <= r; y++) s += tmp[(clamp(y, 0, FH - 1) * FW + x) * 3 + c];
+      for (let y = 0; y < FH; y++) {
+        out[(y * FW + x) * 3 + c] = s / w1;
+        s += tmp[(clamp(y + r + 1, 0, FH - 1) * FW + x) * 3 + c]
+           - tmp[(clamp(y - r, 0, FH - 1) * FW + x) * 3 + c];
+      }
+    }
+  }
+  return out;
+}
+function meshBackgroundF(dataF) {
+  /* like meshBackground but for planar Float32 RGB that may be negative
+     (used on frame-minus-temporal difference fields); 1-DN histogram bins
+     offset by 300 */
+  const gh = Math.floor(FH / ENH_MESH), gw = Math.floor(FW / ENH_MESH);
+  const grid = new Float32Array(gh * gw * 3);
+  const hist = new Uint16Array(600);
+  for (let cy = 0; cy < gh; cy++) for (let cx = 0; cx < gw; cx++) {
+    for (let c = 0; c < 3; c++) {
+      hist.fill(0);
+      const y1 = cy === gh - 1 ? FH : (cy + 1) * ENH_MESH;
+      const x1 = cx === gw - 1 ? FW : (cx + 1) * ENH_MESH;
+      let n = 0;
+      for (let y = cy * ENH_MESH; y < y1; y++) {
+        let p = (y * FW + cx * ENH_MESH) * 3 + c;
+        for (let x = cx * ENH_MESH; x < x1; x++, p += 3) {
+          hist[clamp(Math.round(dataF[p]) + 300, 0, 599)]++;
+          n++;
+        }
+      }
+      const target = n * ENH_PCTL;
+      let acc = 0, v = 0;
+      for (; v < 600; v++) { acc += hist[v]; if (acc >= target) break; }
+      grid[(cy * gw + cx) * 3 + c] = v - 300;
+    }
+  }
+  const med = new Float32Array(grid.length);
+  const buf = [];
+  for (let cy = 0; cy < gh; cy++) for (let cx = 0; cx < gw; cx++) {
+    for (let c = 0; c < 3; c++) {
+      buf.length = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const yy = clamp(cy + dy, 0, gh - 1), xx = clamp(cx + dx, 0, gw - 1);
+        buf.push(grid[(yy * gw + xx) * 3 + c]);
+      }
+      buf.sort((a, b) => a - b);
+      med[(cy * gw + cx) * 3 + c] = buf[4];
+    }
+  }
+  let bg = new Float32Array(FW * FH * 3);
+  for (let y = 0; y < FH; y++) {
+    const fy = clamp((y + 0.5) / ENH_MESH - 0.5, 0, gh - 1);
+    const y0 = Math.floor(fy), yb = Math.min(y0 + 1, gh - 1), wy = fy - y0;
+    for (let x = 0; x < FW; x++) {
+      const fx = clamp((x + 0.5) / ENH_MESH - 0.5, 0, gw - 1);
+      const x0 = Math.floor(fx), xb = Math.min(x0 + 1, gw - 1), wx = fx - x0;
+      const o = (y * FW + x) * 3;
+      for (let c = 0; c < 3; c++) {
+        bg[o + c] = med[(y0 * gw + x0) * 3 + c] * (1 - wy) * (1 - wx)
+                  + med[(y0 * gw + xb) * 3 + c] * (1 - wy) * wx
+                  + med[(yb * gw + x0) * 3 + c] * wy * (1 - wx)
+                  + med[(yb * gw + xb) * 3 + c] * wy * wx;
+      }
+    }
+  }
+  bg = boxBlur3(bg, 21);
+  bg = boxBlur3(bg, 21);
+  return bg;
+}
+function blur1(a, r, passes) {
+  /* separable box blur on a single-channel Float32Array, run `passes` times */
+  let src = a;
+  for (let k = 0; k < passes; k++) {
+    const tmp = new Float32Array(src.length);
+    const out = new Float32Array(src.length);
+    const w1 = 2 * r + 1;
+    for (let y = 0; y < FH; y++) {
+      let s = 0;
+      for (let x = -r; x <= r; x++) s += src[y * FW + clamp(x, 0, FW - 1)];
+      for (let x = 0; x < FW; x++) {
+        tmp[y * FW + x] = s / w1;
+        s += src[y * FW + clamp(x + r + 1, 0, FW - 1)]
+           - src[y * FW + clamp(x - r, 0, FW - 1)];
+      }
+    }
+    for (let x = 0; x < FW; x++) {
+      let s = 0;
+      for (let y = -r; y <= r; y++) s += tmp[clamp(y, 0, FH - 1) * FW + x];
+      for (let y = 0; y < FH; y++) {
+        out[y * FW + x] = s / w1;
+        s += tmp[clamp(y + r + 1, 0, FH - 1) * FW + x]
+           - tmp[clamp(y - r, 0, FH - 1) * FW + x];
+      }
+    }
+    src = out;
+  }
+  return src;
+}
+const smoothstep = t => { const c = clamp(t, 0, 1); return c * c * (3 - 2 * c); };
+function enhResidual(f) {
+  /* frame index -> {res: Float32Array(FW*FH*3), L: Float32Array(FW*FH)}.
+     Background = per-frame spatial mesh, with a color-gated regional
+     handover to the level-adjusted temporal (segment-median) model where
+     the spatial fit has clearly absorbed extended green/red aurora.  The
+     gate keeps blue/neutral twilight evolution out (Rayleigh is never
+     auroral), so faint moving patches survive without twilight leakage.
+     Falls back to spatial-only until the background bank has loaded. */
+  const e = getImage(f);
+  if (!e.ok) return null;
+  if (e.enhRes) return e.enhRes;
+  const fd = frameImageData(f);
+  if (!fd) return null;
+  const d = fd.data;
+  const N = FW * FH;
+  const bgS = meshBackground(d);
+  const bank = bgImages.length ? bgImages[bgSegmentFor(f)] : null;
+  let bg = bgS;
+  let hybrid = false;
+  if (bank) {
+    hybrid = true;
+    const bd = bank.data;
+    /* denoised temporal shape */
+    let tm = new Float32Array(N * 3);
+    for (let p = 0, o = 0; p < N; p++, o += 3) {
+      const q = p * 4;
+      tm[o] = bd[q]; tm[o + 1] = bd[q + 1]; tm[o + 2] = bd[q + 2];
+    }
+    tm = boxBlur3(boxBlur3(boxBlur3(tm, 1), 1), 1);
+    /* level adjustment: smooth lower-envelope of (frame - tm) */
+    const diff = new Float32Array(N * 3);
+    for (let p = 0, o = 0; p < N; p++, o += 3) {
+      const q = p * 4;
+      diff[o] = d[q] - tm[o];
+      diff[o + 1] = d[q + 1] - tm[o + 1];
+      diff[o + 2] = d[q + 2] - tm[o + 2];
+    }
+    const corr = meshBackgroundF(diff);
+    /* takeover weight: spatial clearly above adjusted-temporal AND the
+       would-be signal is green/red (auroral), both regionally smoothed */
+    const dl = new Float32Array(N);
+    const ex = new Float32Array(N);
+    for (let p = 0, o = 0; p < N; p++, o += 3) {
+      const q = p * 4;
+      const taR = tm[o] + corr[o], taG = tm[o + 1] + corr[o + 1],
+            taB = tm[o + 2] + corr[o + 2];
+      dl[p] = 0.299 * (bgS[o] - taR) + 0.587 * (bgS[o + 1] - taG)
+            + 0.114 * (bgS[o + 2] - taB);
+      const rR = d[q] - taR, rG = d[q + 1] - taG, rB = d[q + 2] - taB;
+      ex[p] = Math.max(rG - 0.5 * (rR + rB), rR - 0.5 * (rG + rB));
+    }
+    const dls = blur1(dl, 3, 3);
+    const exs = blur1(ex, 3, 3);
+    const THETA = 3.0;
+    bg = new Float32Array(N * 3);
+    for (let p = 0, o = 0; p < N; p++, o += 3) {
+      const w = smoothstep((dls[p] - 0.5 * THETA) / THETA)
+              * smoothstep((exs[p] - 0.4) / 0.8);
+      for (let c = 0; c < 3; c++) {
+        const ta = tm[o + c] + corr[o + c];
+        bg[o + c] = bgS[o + c] - w * (bgS[o + c] - ta);
+      }
+    }
+  }
+  const res = new Float32Array(N * 3);
+  const L = new Float32Array(N);
+  for (let p = 0, o = 0; p < N; p++, o += 3) {
+    const q = p * 4;
+    res[o] = d[q] - bg[o];
+    res[o + 1] = d[q + 1] - bg[o + 1];
+    res[o + 2] = d[q + 2] - bg[o + 2];
+    L[p] = 0.299 * res[o] + 0.587 * res[o + 1] + 0.114 * res[o + 2];
+  }
+  const out = { res, L };
+  if (hybrid) e.enhRes = out;   // spatial-only fallback: recompute once the bank loads
+  return out;
+}
+let enhCache = { frame: -1, canvas: null };
+function drawEnhanced() {
+  if (enhCache.frame === cur.frame && enhCache.canvas) {
+    ctx.drawImage(enhCache.canvas, 0, 0);
+    return true;
+  }
+  const er = enhResidual(cur.frame);
+  if (!er) return false;
+  const { res, L } = er;
+  const sky = manifest.sky;
+  /* robust stats over sky pixels (every 3rd px each axis) */
+  const samp = [];
+  for (let y = 0; y < FH; y += 3) for (let x = 0; x < FW; x += 3) {
+    const dx = x - sky.cx, dy = y - sky.cy;
+    if (dx * dx + dy * dy <= sky.r * sky.r) samp.push(L[y * FW + x]);
+  }
+  samp.sort((a, b) => a - b);
+  const q = t => samp[clamp(Math.floor(t * samp.length), 0, samp.length - 1)];
+  const median = q(0.5);
+  const dev = samp.map(v => Math.abs(v - median)).sort((a, b) => a - b);
+  const sigma = Math.max(1.4826 * dev[Math.floor(dev.length / 2)], 0.6);
+  const s = 1.2 * sigma;
+  const hi = Math.asinh(Math.max(q(0.998), s * 3) / s);
+  const g = 205.0 / hi;
+  const fd = frameImageData(cur.frame);
+  const out = new ImageData(FW, FH);
+  const o = out.data, d = fd.data;
+  const r2 = sky.r * sky.r;
+  for (let y = 0; y < FH; y++) {
+    const dy = y - sky.cy;
+    for (let x = 0; x < FW; x++) {
+      const p = y * FW + x, q4 = p * 4, o3 = p * 3;
+      const dx = x - sky.cx;
+      if (dx * dx + dy * dy > r2) {   // outside sky: dimmed original
+        o[q4] = d[q4] * 0.25; o[q4 + 1] = d[q4 + 1] * 0.25;
+        o[q4 + 2] = d[q4 + 2] * 0.25; o[q4 + 3] = 255;
+        continue;
+      }
+      const l = L[p];
+      let scale = 0;
+      if (l > 0.05) scale = Math.asinh(l / s) / l * g;
+      o[q4] = clamp(res[o3] * scale + ENH_BIAS, 0, 255);
+      o[q4 + 1] = clamp(res[o3 + 1] * scale + ENH_BIAS, 0, 255);
+      o[q4 + 2] = clamp(res[o3 + 2] * scale + ENH_BIAS, 0, 255);
+      o[q4 + 3] = 255;
+    }
+  }
+  const oc = new OffscreenCanvas(FW, FH);
+  oc.getContext("2d").putImageData(out, 0, 0);
+  enhCache = { frame: cur.frame, canvas: oc };
+  ctx.drawImage(oc, 0, 0);
+  return true;
+}
+
+/* ================================ snap ================================== */
+function bgSegmentFor(f) {
+  const n = manifest.video.nframes;
+  const seg = Math.floor(f / (n / bgImages.length));
+  return clamp(seg, 0, bgImages.length - 1);
+}
+/* Regions are freehand outlines: flat [x0,y0, x1,y1, ...] in image px,
+   implicitly closed.  Legacy records store an ellipse {cx,cy,rx,ry,rot};
+   recRegion() converts those on read so old annotations keep working. */
+function polyFromEllipse(el) {
+  const pts = [];
+  const c = Math.cos(el.rot || 0), s = Math.sin(el.rot || 0);
+  for (let i = 0; i < 48; i++) {
+    const a = i / 48 * 2 * Math.PI;
+    const u = el.rx * Math.cos(a), v = el.ry * Math.sin(a);
+    pts.push(el.cx + u * c - v * s, el.cy + u * s + v * c);
+  }
+  return pts;
+}
+function recRegion(rec) {
+  if (!rec) return null;
+  if (rec.poly && rec.poly.length >= 6) return rec.poly;
+  if (rec.ellipse) return polyFromEllipse(rec.ellipse);
+  return null;
+}
+function polyBounds(poly) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let i = 0; i < poly.length; i += 2) {
+    x0 = Math.min(x0, poly[i]); x1 = Math.max(x1, poly[i]);
+    y0 = Math.min(y0, poly[i + 1]); y1 = Math.max(y1, poly[i + 1]);
+  }
+  return { x0, y0, x1, y1 };
+}
+function polyArea(poly) {
+  let a = 0;
+  for (let i = 0, n = poly.length; i < n; i += 2) {
+    const j = (i + 2) % n;
+    a += poly[i] * poly[j + 1] - poly[j] * poly[i + 1];
+  }
+  return Math.abs(a) / 2;
+}
+function pointInPoly(x, y, poly) {
+  let inside = false;
+  for (let i = 0, n = poly.length; i < n; i += 2) {
+    const j = (i + 2) % n;
+    const yi = poly[i + 1], yj = poly[j + 1];
+    if ((yi > y) !== (yj > y)) {
+      const xi = poly[i], xj = poly[j];
+      if (x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+    }
+  }
+  return inside;
+}
+function simplifyPath(poly, eps) {
+  /* Ramer–Douglas–Peucker on the open path (keeps file size sane for long
+     freehand traces; ~1 px tolerance is invisible at labeling zoom) */
+  const n = poly.length / 2;
+  if (n < 3) return poly;
+  const keep = new Uint8Array(n);
+  keep[0] = keep[n - 1] = 1;
+  const stack = [[0, n - 1]];
+  while (stack.length) {
+    const [a, b] = stack.pop();
+    const ax = poly[a * 2], ay = poly[a * 2 + 1];
+    const bx = poly[b * 2], by = poly[b * 2 + 1];
+    const dx = bx - ax, dy = by - ay;
+    const len = Math.hypot(dx, dy) || 1e-9;
+    let worst = -1, wd = 0;
+    for (let i = a + 1; i < b; i++) {
+      const d = Math.abs((poly[i * 2] - ax) * dy - (poly[i * 2 + 1] - ay) * dx) / len;
+      if (d > wd) { wd = d; worst = i; }
+    }
+    if (wd > eps && worst > 0) {
+      keep[worst] = 1;
+      stack.push([a, worst], [worst, b]);
+    }
+  }
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    if (keep[i]) {
+      out.push(Math.round(poly[i * 2] * 10) / 10,
+               Math.round(poly[i * 2 + 1] * 10) / 10);
+    }
+  }
+  return out;
+}
+function snapMask(f, poly, hi) {
+  const fd = frameImageData(f);
+  const bg = bgImages[bgSegmentFor(f)];
+  if (!fd || !bg) return null;
+  const others = new Uint8Array(FW * FH);
+  const fr = frameRec(f);
+  if (fr && fr.tracks) {
+    for (const [tid, rec] of Object.entries(fr.tracks)) {
+      if (+tid !== cur.trackId && rec.state === "accepted" && rec.rle) {
+        const dm = rleDecode(rec.rle).mask;
+        for (let i = 0; i < dm.length; i++) if (dm[i]) others[i] = 1;
+      }
+    }
+  }
+  const region = rasterizePoly(poly);   // sky-clipped; masks never leave it
+  const b = polyBounds(poly);
+  const x0 = clamp(Math.floor(b.x0), 0, FW - 1);
+  const x1 = clamp(Math.ceil(b.x1), 0, FW - 1);
+  const y0 = clamp(Math.floor(b.y0), 0, FH - 1);
+  const y1 = clamp(Math.ceil(b.y1), 0, FH - 1);
+  const fp = fd.data, bp = bg.data;
+  /* third feature: per-frame spatial-mesh residual — the temporal bank
+     absorbs faint aurora that persists for most of the clip, so without
+     this, faint PMAFs score ~0 and never snap (algo_version 2) */
+  const er = enhResidual(f);
+  const idxs = [], dLs = [], dGs = [], dMs = [];
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const p = y * FW + x;
+      if (others[p] || !region[p]) continue;
+      const q = p * 4;
+      const L = 0.299 * fp[q] + 0.587 * fp[q + 1] + 0.114 * fp[q + 2];
+      const Lb = 0.299 * bp[q] + 0.587 * bp[q + 1] + 0.114 * bp[q + 2];
+      const G = fp[q + 1] - Math.max(fp[q], fp[q + 2]);
+      const Gb = bp[q + 1] - Math.max(bp[q], bp[q + 2]);
+      idxs.push(p);
+      dLs.push(L - Lb);
+      dGs.push(G - Gb);
+      dMs.push(er ? er.L[p] : 0);
+    }
+  }
+  if (idxs.length < 20) return null;
+  const pct = (arr, q) => {
+    const a = [...arr].sort((x, y) => x - y);
+    return a[clamp(Math.floor(q * a.length), 0, a.length - 1)];
+  };
+  const l20 = pct(dLs, 0.2), l98 = pct(dLs, 0.98);
+  const g20 = pct(dGs, 0.2), g98 = pct(dGs, 0.98);
+  const m20 = pct(dMs, 0.2), m98 = pct(dMs, 0.98);
+  const nrm = (v, a, b) => b - a < 1e-6 ? 0 : clamp((v - a) / (b - a), 0, 1);
+  const score = new Float32Array(FW * FH).fill(-1);
+  for (let k = 0; k < idxs.length; k++) {
+    score[idxs[k]] = Math.max(nrm(dLs[k], l20, l98), nrm(dGs[k], g20, g98),
+                              er ? nrm(dMs[k], m20, m98) : 0);
+  }
+  const lo = hi * 0.6;
+  const mask = new Uint8Array(FW * FH);
+  const queue = [];
+  for (const p of idxs) {
+    if (score[p] >= hi) { mask[p] = 1; queue.push(p); }
+  }
+  while (queue.length) {
+    const p = queue.pop();
+    const x = p % FW, y = (p / FW) | 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      if (!dx && !dy) continue;
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= FW || ny >= FH) continue;
+      const np = ny * FW + nx;
+      if (mask[np] || score[np] < lo) continue;
+      mask[np] = 1;
+      queue.push(np);
+    }
+  }
+  let area = 0;
+  for (let i = 0; i < mask.length; i++) area += mask[i];
+  if (!area) return null;
+  return { mask, area };
+}
+function rasterizePoly(poly) {
+  /* even-odd scanline fill, clipped to the sky circle — pure JS so the
+     result is identical in the browser and the headless test harness */
+  const mask = new Uint8Array(FW * FH);
+  const sky = manifest.sky;
+  const b = polyBounds(poly);
+  const y0 = clamp(Math.floor(b.y0), 0, FH - 1);
+  const y1 = clamp(Math.ceil(b.y1), 0, FH - 1);
+  const n = poly.length;
+  const xs = [];
+  for (let y = y0; y <= y1; y++) {
+    const yc = y + 0.5;
+    xs.length = 0;
+    for (let i = 0; i < n; i += 2) {
+      const j = (i + 2) % n;
+      const ya = poly[i + 1], yb = poly[j + 1];
+      if ((ya > yc) === (yb > yc)) continue;
+      xs.push(poly[i] + (yc - ya) / (yb - ya) * (poly[j] - poly[i]));
+    }
+    xs.sort((a, c) => a - c);
+    for (let k = 0; k + 1 < xs.length; k += 2) {
+      const xa = clamp(Math.round(xs[k]), 0, FW - 1);
+      const xb = clamp(Math.round(xs[k + 1]), 0, FW - 1);
+      for (let x = xa; x <= xb; x++) {
+        const dxs = x - sky.cx, dys = y - sky.cy;
+        if (dxs * dxs + dys * dys <= sky.r * sky.r) mask[y * FW + x] = 1;
+      }
+    }
+  }
+  return mask;
+}
+
+/* ============================ state machine ============================= */
+/* Stored states are ONLY accepted | absent (plus per-frame bad).  Machine
+   suggestions and in-progress edits live in `pending` — a transient,
+   never-saved preview for (cur.frame, active track).  Accept materializes
+   it; navigating away discards it; an accepted record being edited stays
+   intact in the doc until the edit is re-accepted. */
+let pending = null;   // { frame, tid, poly?, rle?, provenance? }
+let previewEpoch = 0; // bumped on every discard: kills stale async previews
+
+function activeRec() {
+  return cur.trackId == null ? undefined : trackRec(cur.frame, cur.trackId);
+}
+function pendingActive() {
+  return pending && pending.frame === cur.frame && pending.tid === cur.trackId
+    ? pending : null;
+}
+function clonePendingFromRec(rec) {
+  const region = recRegion(rec);
+  pending = { frame: cur.frame, tid: cur.trackId,
+    poly: region ? region.slice() : undefined,
+    rle: rec.rle,
+    provenance: rec.provenance ? { ...rec.provenance } : undefined };
+  return pending;
+}
+function discardPending() { pending = null; previewEpoch++; }
+
+function acceptCurrent() {
+  const tid = cur.trackId;
+  if (tid == null) { toast("select or create a track first", "warn"); return; }
+  const fr = frameRec(cur.frame);
+  if (fr && fr.bad) { toast("bad frame — cannot accept; unmark with Q", "warn"); return; }
+  let src = pendingActive();
+  if (!src) {
+    const rec = trackRec(cur.frame, tid);
+    if (rec && rec.state === "accepted") {   // reviewed already: just advance
+      advanceAndPreview();
+      return;
+    }
+    toast("circle the form (E) or press P to copy the previous one", "warn");
+    return;
+  }
+  src = { ...src };
+  if (!src.rle) {
+    if (!src.poly) { toast("circle the form (E) first", "warn"); return; }
+    if (src.provenance && src.provenance.method === "snap") {
+      /* the snap found nothing — accepting must not silently substitute a
+         filled outline for a failed segmentation */
+      toast("no mask: snap found nothing here — press S after adjusting, " +
+            "paint with B, or mark absent (V)", "warn");
+      return;
+    }
+    src.rle = rleEncode(rasterizePoly(src.poly), FW, FH);
+    src.provenance = { method: "region", algo_version: SNAP_ALGO_VERSION };
+    toast("mask = circled region, filled (no snap was run)");
+  }
+  /* ontology: masks are disjoint — earlier-accepted tracks keep contested px */
+  const mine = rleDecode(src.rle).mask;
+  let removed = 0;
+  if (fr && fr.tracks) {
+    for (const [otid, orec] of Object.entries(fr.tracks)) {
+      if (+otid !== tid && orec.state === "accepted" && orec.rle) {
+        const om = rleDecode(orec.rle).mask;
+        for (let i = 0; i < mine.length; i++) {
+          if (mine[i] && om[i]) { mine[i] = 0; removed++; }
+        }
+      }
+    }
+  }
+  let area = 0;
+  for (let i = 0; i < mine.length; i++) area += mine[i];
+  if (!area) { toast("mask empty after removing overlap with accepted tracks", "err"); return; }
+  if (removed) {
+    toast(`${removed} px kept by earlier-accepted track`, "warn");
+    src.provenance = { ...(src.provenance || {}), overlap_subtracted_px: removed };
+  }
+  pushUndo(cur.frame);   // after validation: a refused accept keeps redo intact
+  setTrackRec(cur.frame, tid, {
+    state: "accepted", poly: src.poly, rle: rleEncode(mine, FW, FH),
+    provenance: src.provenance, updated_at: new Date().toISOString() });
+  discardPending();
+  invalidateMasks();
+  advanceAndPreview();
+}
+function advanceAndPreview() {
+  const st = +($("stride").value || 1);
+  const nf = clamp(cur.frame + st, 0, manifest.video.nframes - 1);
+  if (nf === cur.frame) { render(); return; }
+  const srcFrame = cur.frame;
+  gotoFrame(nf);
+  const tid = cur.trackId;
+  if (tid == null) return;
+  if (trackRec(nf, tid)) return;          // reviewed already: nothing to do
+  makePreview(srcFrame, nf, tid);
+}
+function makePreview(srcFrame, dstFrame, tid) {
+  /* transient copy-forward + snap; shown until accepted or navigated away */
+  const track = trackById(tid);
+  const src = trackRec(srcFrame, tid);
+  const srcRegion = src && src.state === "accepted" ? recRegion(src) : null;
+  if (!track || !srcRegion) return;
+  const region = srcRegion.slice();
+  const gen = projectGen;
+  const epoch = previewEpoch;  // navigate-away-and-back must not resurrect this
+  const uuid = track.uuid;     // guards against delete + numeric-id reuse
+  const run = () => {
+    if (gen !== projectGen || epoch !== previewEpoch
+        || cur.frame !== dstFrame || cur.trackId !== tid) return;
+    const tNow = trackById(tid);
+    if (!tNow || tNow.uuid !== uuid) return;
+    if (trackRec(dstFrame, tid)) return;   // user reviewed it meanwhile
+    if (pending || drag) return;           // user started something manually
+    const hi = +$("hi").value;
+    const res = snapMask(dstFrame, region, hi);
+    pending = { frame: dstFrame, tid, poly: region,
+      provenance: { method: "snap",
+        params: { hi, contain: SNAP_CONTAIN, bg_seg: bgSegmentFor(dstFrame) },
+        src_frame: srcFrame, algo_version: SNAP_ALGO_VERSION } };
+    if (res) pending.rle = rleEncode(res.mask, FW, FH);
+    else toast("preview: snap found nothing — adjust and press S, paint " +
+               "with B, or mark absent (V)", "warn");
+    renderTracks();
+    render();
+  };
+  const e = getImage(dstFrame);
+  if (e.ok) run(); else e.img.addEventListener("load", run, { once: true });
+}
+function previewFromNearest() {
+  const tid = cur.trackId;
+  if (tid == null) { toast("select a track first", "warn"); return; }
+  const existing = trackRec(cur.frame, tid);
+  if (existing) {
+    toast(`this frame is already ${existing.state} — Clear (⌫) it first`, "warn");
+    return;
+  }
+  let src = -1;
+  for (let f = cur.frame - 1; f >= Math.max(0, cur.frame - 50); f--) {
+    const r = trackRec(f, tid);
+    if (r && r.state === "accepted") { src = f; break; }
+  }
+  if (src < 0) { toast("no accepted frame within 50 back", "warn"); return; }
+  makePreview(src, cur.frame, tid);
+}
+function markAbsent() {
+  const tid = cur.trackId;
+  if (tid == null) { toast("select a track first", "warn"); return; }
+  pushUndo(cur.frame);
+  discardPending();
+  setTrackRec(cur.frame, tid, { state: "absent",
+    updated_at: new Date().toISOString() });
+  invalidateMasks();
+  const st = +($("stride").value || 1);
+  gotoFrame(clamp(cur.frame + st, 0, manifest.video.nframes - 1));
+}
+function clearRec() {
+  if (cur.trackId == null) return;
+  const had = trackRec(cur.frame, cur.trackId);
+  discardPending();
+  if (had) {
+    pushUndo(cur.frame);
+    setTrackRec(cur.frame, cur.trackId, undefined);
+  }
+  invalidateMasks();
+  renderTracks();
+  render();
+}
+function toggleBad() {
+  pushUndo(cur.frame);
+  const fr = ensureFrame(cur.frame);
+  fr.bad = !fr.bad;
+  if (!fr.bad && !Object.keys(fr.tracks).length) delete doc.frames[String(cur.frame)];
+  markDirty(cur.frame);
+  toast(fr.bad ? "frame marked bad — press Q again to undo"
+               : "bad mark removed");
+  render();
+}
+function runSnap() {
+  const tid = cur.trackId;
+  if (tid == null) { toast("select a track first", "warn"); return; }
+  let p = pendingActive();
+  if (!p) {
+    const rec = trackRec(cur.frame, tid);
+    if (rec && rec.state === "accepted" && recRegion(rec)) p = clonePendingFromRec(rec);
+    else { toast("circle the form first (E)", "warn"); return; }
+  }
+  if (!p.poly) { toast("snap needs a region — circle the form (E)", "warn"); return; }
+  const hi = +$("hi").value;
+  const res = snapMask(cur.frame, p.poly, hi);
+  if (!res) {
+    /* honest failure: never leave the previous mask under a new threshold,
+       and record the failed snap so Accept refuses the ellipse fallback */
+    delete p.rle;
+    const keepSrcF = p.provenance && p.provenance.src_frame;
+    p.provenance = { method: "snap", failed: true,
+      params: { hi, contain: SNAP_CONTAIN, bg_seg: bgSegmentFor(cur.frame) },
+      algo_version: SNAP_ALGO_VERSION };
+    if (keepSrcF !== undefined) p.provenance.src_frame = keepSrcF;
+    toast("snap found nothing at this threshold — mask cleared; lower it?", "warn");
+    render();
+    return;
+  }
+  p.rle = rleEncode(res.mask, FW, FH);
+  const keepSrc = p.provenance && p.provenance.src_frame;
+  p.provenance = { method: "snap",
+    params: { hi, contain: SNAP_CONTAIN, bg_seg: bgSegmentFor(cur.frame) },
+    algo_version: SNAP_ALGO_VERSION };
+  if (keepSrc !== undefined) p.provenance.src_frame = keepSrc;
+  render();
+}
+
+/* --------------------------- track lifecycle ---------------------------- */
+/* "Starts here" / "Ends here": every unreviewed frame before/after the
+   current one becomes absent for this track, flagged auto:<kind> so the
+   action can be undone exactly — even after a reload. */
+function lifecycleMark(kind) {
+  const tid = cur.trackId;
+  const t = tid != null && trackById(tid);
+  if (!t) { toast("select a track first", "warn"); return; }
+  t.events = t.events || [];
+  if (t.events.some(e => e.type === kind)) {
+    toast(`this track already has a '${kind}' point — undo it first below`, "warn");
+    return;
+  }
+  const f = cur.frame;
+  /* consistency: starts must not come after ends, and the span being marked
+     absent must not contain accepted masks (they would contradict the event) */
+  const other = t.events.find(e => e.type === (kind === "ends" ? "starts" : "ends"));
+  if (other && (kind === "ends" ? f < other.frame : f > other.frame)) {
+    toast(`'${kind}' at frame ${f} conflicts with '${other.type}' at ` +
+          `${other.frame} — undo that first`, "warn");
+    return;
+  }
+  const [a, b] = kind === "ends" ? [f + 1, manifest.video.nframes - 1] : [0, f - 1];
+  const conflicts = [];
+  for (const [k, fr] of Object.entries(doc.frames)) {
+    const rec = fr.tracks && fr.tracks[String(tid)];
+    if (rec && rec.state === "accepted" && +k >= a && +k <= b) conflicts.push(+k);
+  }
+  if (conflicts.length) {
+    toast(`cannot mark '${kind}' here: ${conflicts.length} accepted frame(s) ` +
+          `${kind === "ends" ? "after" : "before"} frame ${f} (e.g. ` +
+          `${Math.min(...conflicts)}) — clear them or pick another frame`, "warn");
+    return;
+  }
+  const now = new Date().toISOString();
+  let n = 0;
+  for (let k = a; k <= b; k++) {
+    if (!trackRec(k, tid)) {
+      ensureFrame(k).tracks[String(tid)] = { state: "absent", auto: kind,
+                                            updated_at: now };
+      dirty.add(k);
+      n++;
+    }
+  }
+  t.events.push({ type: kind, frame: f });
+  tracksDirty = true;
+  undoStacks = new Map();   // per-frame snapshots would desync auto records
+  scheduleSave();
+  invalidateMasks();
+  renderTracks();
+  render();
+  toast(kind === "ends"
+    ? `${t.name} ends at frame ${f} — ${n} later frames marked absent (undo below)`
+    : `${t.name} starts at frame ${f} — ${n} earlier frames marked absent (undo below)`);
+}
+function undoLifecycle(t, ev) {
+  let n = 0;
+  for (const [k, fr] of Object.entries(doc.frames)) {
+    const rec = fr.tracks && fr.tracks[String(t.id)];
+    if (rec && rec.state === "absent" && rec.auto === ev.type) {
+      delete fr.tracks[String(t.id)];
+      if (!Object.keys(fr.tracks).length && !fr.bad) delete doc.frames[k];
+      dirty.add(+k);
+      n++;
+    }
+  }
+  t.events = t.events.filter(e => e !== ev);
+  tracksDirty = true;
+  undoStacks = new Map();   // per-frame snapshots would desync auto records
+  scheduleSave();
+  invalidateMasks();
+  renderTracks();
+  render();
+  toast(`'${ev.type}' undone — ${n} auto-absent frames reverted; ` +
+        "the track can continue");
+}
+
+/* ================================ tracks ================================ */
+function newTrack() {
+  discardPending();
+  const used = new Set(doc.tracks.map(t => t.id));
+  let id = 1;
+  while (used.has(id)) id++;
+  const t = { id, uuid: crypto.randomUUID(), name: "PMAF-" + id,
+              color: PALETTE[(id - 1) % PALETTE.length], events: [] };
+  doc.tracks.push(t);
+  tracksDirty = true;
+  scheduleSave();
+  cur.trackId = id;
+  renderTracks();
+  render();
+}
+function deleteTrack() {
+  const t = cur.trackId != null && trackById(cur.trackId);
+  if (!t) { toast("select a track first", "warn"); return; }
+  let acc = 0, other = 0;
+  const affected = [];
+  for (const [k, fr] of Object.entries(doc.frames)) {
+    const r = fr.tracks && fr.tracks[String(t.id)];
+    if (r) {
+      affected.push(+k);
+      if (r.state === "accepted") acc++; else other++;
+    }
+  }
+  if (!confirm(`Delete track "${t.name}" (id ${t.id})?\n` +
+               `This removes ${acc} accepted and ${other} other records ` +
+               `on ${affected.length} frames. This cannot be undone.`)) return;
+  for (const f of affected) {
+    const fr = doc.frames[String(f)];
+    delete fr.tracks[String(t.id)];
+    if (!Object.keys(fr.tracks).length && !fr.bad) delete doc.frames[String(f)];
+    dirty.add(f);
+  }
+  doc.tracks = doc.tracks.filter(o => o.id !== t.id);
+  tracksDirty = true;
+  discardPending();
+  undoStacks = new Map();   // stale snapshots would resurrect the track
+  cur.trackId = doc.tracks.length ? doc.tracks[0].id : null;
+  scheduleSave();
+  invalidateMasks();
+  renderTracks();
+  render();
+  toast(`track deleted (${affected.length} frame records removed)`);
+}
+function renderTracks() {
+  const el = $("tracks");
+  el.innerHTML = "";
+  for (const t of doc.tracks) {
+    const d = document.createElement("div");
+    d.className = "track" + (t.id === cur.trackId ? " active" : "");
+    const rec = trackRec(cur.frame, t.id);
+    const isPend = pending && pending.frame === cur.frame && pending.tid === t.id;
+    const st = rec ? rec.state : (isPend ? "preview" : "unreviewed");
+    const stColor = { accepted: "var(--ok)", absent: "#7d93b8",
+      preview: "var(--warn)", unreviewed: "var(--dim)" }[st] || "var(--dim)";
+    let acc = 0, abs = 0;
+    for (const fr of Object.values(doc.frames)) {
+      const r = fr.tracks && fr.tracks[String(t.id)];
+      if (r) { if (r.state === "accepted") acc++; else if (r.state === "absent") abs++; }
+    }
+    d.innerHTML = `<span class="dot" style="background:${t.color}"></span>` +
+      `<span class="nm">${t.name}</span>` +
+      `<span class="st badge" style="color:${stColor}">${st}</span>` +
+      `<div style="color:var(--dim);font-size:11.5px;margin-top:2px">` +
+      `id ${t.id} · ${acc} accepted · ${abs} absent</div>`;
+    d.onclick = () => {
+      if (t.id !== cur.trackId) discardPending();
+      cur.trackId = t.id; renderTracks(); render(); saveSession();
+    };
+    d.ondblclick = () => {
+      const nm = prompt("Track name", t.name);
+      if (nm) { t.name = nm; tracksDirty = true; scheduleSave(); renderTracks(); }
+    };
+    el.appendChild(d);
+  }
+  renderEvents();
+}
+function renderEvents() {
+  const t = cur.trackId != null && trackById(cur.trackId);
+  const el = $("events");
+  if (!t) { el.textContent = "no track selected"; return; }
+  const evs = t.events || [];
+  el.innerHTML = evs.map((e, i) =>
+    `<div>· ${e.type}${e.other != null ? " track " + e.other : ""} @ f${e.frame}
+     <a href="#" data-f="${e.frame}">go</a>` +
+    (e.type === "starts" || e.type === "ends"
+      ? ` <a href="#" data-undo="${i}" style="color:var(--warn)">undo</a>` : "") +
+    `</div>`)
+    .join("") || `<span style="color:var(--dim)">none</span>`;
+  el.querySelectorAll("a[data-f]").forEach(a => a.onclick = ev => {
+    ev.preventDefault(); gotoFrame(+a.dataset.f);
+  });
+  el.querySelectorAll("a[data-undo]").forEach(a => a.onclick = ev => {
+    ev.preventDefault(); undoLifecycle(t, evs[+a.dataset.undo]);
+  });
+}
+
+/* =============================== rendering =============================== */
+const cv = $("cv"), ctx = cv.getContext("2d");
+let maskLayer = null;   // offscreen for overlays
+function fitView() {
+  const r = cv.getBoundingClientRect();
+  cv.width = r.width * devicePixelRatio;
+  cv.height = r.height * devicePixelRatio;
+  if (!view.fitted) {
+    const z = Math.min(cv.width / FW, cv.height / FH) * 0.98;
+    view.zoom = z;
+    view.panX = (cv.width - FW * z) / 2;
+    view.panY = (cv.height - FH * z) / 2;
+    view.fitted = true;
+  }
+}
+function imgToCanvas(x, y) { return [x * view.zoom + view.panX, y * view.zoom + view.panY]; }
+function canvasToImg(x, y) { return [(x - view.panX) / view.zoom, (y - view.panY) / view.zoom]; }
+function render() {
+  if (!manifest) return;
+  fitView();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.setTransform(view.zoom, 0, 0, view.zoom, view.panX, view.panY);
+  ctx.imageSmoothingEnabled = view.zoom < 3;
+  const e = getImage(cur.frame);
+  const vm = $("viewmode").value;
+  if (e.ok) {
+    let drawn = false;
+    if (vm === "enhanced") drawn = drawEnhanced();
+    if (!drawn) ctx.drawImage(e.img, 0, 0);
+  } else {
+    ctx.fillStyle = "#222";
+    ctx.fillRect(0, 0, FW, FH);
+  }
+  if (!hidden) {
+    drawMasks();
+    drawRegion();
+  }
+  drawHud();
+  prefetch();
+  drawTimeline();
+  renderFrameInfo();
+}
+function drawMasks() {
+  const masks = masksForFrame(cur.frame);
+  const pend = pendingActive();
+  if (!masks.size && !(pend && pend.rle)) return;
+  const op = +$("opacity").value;
+  if (!maskLayer) maskLayer = new OffscreenCanvas(FW, FH);
+  const mctx = maskLayer.getContext("2d", { willReadFrequently: true });
+  const out = mctx.createImageData(FW, FH);
+  const o = out.data;
+  const paint = (mask, color, alpha) => {
+    const [r, g, b] = [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16));
+    for (let p = 0; p < mask.length; p++) {
+      if (!mask[p]) continue;
+      const q = p * 4;
+      /* boundary pixels drawn stronger for precision */
+      const x = p % FW, y = (p / FW) | 0;
+      const edge = (x === 0 || !mask[p - 1]) || (x === FW - 1 || !mask[p + 1]) ||
+                   (y === 0 || !mask[p - FW]) || (y === FH - 1 || !mask[p + FW]);
+      o[q] = r; o[q + 1] = g; o[q + 2] = b;
+      o[q + 3] = edge ? Math.min(255, alpha + 110) : alpha;
+    }
+  };
+  for (const [tid, mask] of masks) {
+    const t = trackById(tid);
+    if (!t) continue;
+    /* while a preview edit exists, it replaces this track's stored mask */
+    if (pend && +tid === pend.tid) continue;
+    paint(mask, t.color, Math.round(255 * op));
+  }
+  if (pend && pend.rle) {
+    const t = trackById(pend.tid);
+    if (t) {
+      try { paint(rleDecode(pend.rle).mask, t.color, Math.round(255 * op * 0.7)); }
+      catch (err) { console.error("pending RLE", err); }
+    }
+  }
+  mctx.putImageData(out, 0, 0);
+  ctx.drawImage(maskLayer, 0, 0);
+}
+function activeRegion() {
+  /* the outline the user can currently manipulate: preview first, else the
+     stored accepted record's */
+  const pend = pendingActive();
+  if (pend) return { poly: pend.poly, committed: false };
+  const rec = activeRec();
+  if (rec) {
+    const region = recRegion(rec);
+    if (region) return { poly: region, committed: rec.state === "accepted" };
+  }
+  return { poly: null, committed: false };
+}
+function drawRegion() {
+  const { poly, committed } = activeRegion();
+  if (!poly || poly.length < 4) return;
+  const t = trackById(cur.trackId);
+  const tracing = drag && drag.kind === "lasso";
+  ctx.save();
+  ctx.strokeStyle = t ? t.color : "#fff";
+  ctx.lineWidth = 1.6 / view.zoom;
+  ctx.setLineDash(committed ? [] : [6 / view.zoom, 4 / view.zoom]);
+  ctx.beginPath();
+  ctx.moveTo(poly[0], poly[1]);
+  for (let i = 2; i < poly.length; i += 2) ctx.lineTo(poly[i], poly[i + 1]);
+  if (!tracing) ctx.closePath();
+  ctx.stroke();
+  if (tracing) {
+    /* faint closing segment shows what releasing the button would produce */
+    ctx.globalAlpha = 0.4;
+    ctx.beginPath();
+    ctx.moveTo(poly[poly.length - 2], poly[poly.length - 1]);
+    ctx.lineTo(poly[0], poly[1]);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+function drawHud() {
+  const tinfo = manifest.timing.frames[cur.frame] || {};
+  const fr = frameRec(cur.frame);
+  const t = cur.trackId != null && trackById(cur.trackId);
+  const rec = activeRec();
+  const st = pendingActive() ? "preview — A accepts"
+           : (rec ? rec.state : "unreviewed");
+  $("hud").innerHTML =
+    `frame <b>${cur.frame}</b> / ${manifest.video.nframes - 1}` +
+    (tinfo.ut ? ` · <b>${tinfo.ut} UT</b>` : "") +
+    (tinfo.method && tinfo.method !== "ocr" ? ` <span style="color:var(--warn)">[${tinfo.method}]</span>` : "") +
+    (fr && fr.bad ? ` · <span style="color:var(--err)">BAD FRAME</span>` : "") +
+    (t ? ` · ${t.name}: <b>${st}</b>` : " · no track selected");
+  $("badbtn").textContent = fr && fr.bad ? "Unmark bad (Q)" : "Bad frame (Q)";
+}
+function renderFrameInfo() {
+  const tinfo = manifest.timing.frames[cur.frame] || {};
+  $("frameinfo").innerHTML =
+    `UT ${tinfo.ut || "?"} (${tinfo.method || "?"}, conf ${tinfo.conf ?? "?"})<br>` +
+    (tinfo.iso ? tinfo.iso + "<br>" : "") +
+    `bg segment ${bgImages.length ? bgSegmentFor(cur.frame) : "?"}`;
+  $("fcount").textContent = `${cur.frame} / ${manifest.video.nframes - 1}`;
+  $("seek").value = cur.frame;
+}
+
+/* ------------------------------- timeline ------------------------------- */
+const tl = $("timeline"), tctx = tl.getContext("2d");
+const stateColors = { accepted: "#2f8f45", absent: "#4a6285",
+                      unreviewed: "#2a2d35" };
+function drawTimeline() {
+  const n = manifest ? manifest.video.nframes : 1;
+  const lanes = Math.max(doc ? doc.tracks.length : 0, 1);
+  const laneH = 7;
+  tl.height = lanes * laneH + 6;
+  tl.width = tl.clientWidth * devicePixelRatio || 800;
+  tctx.fillStyle = "#14161a";
+  tctx.fillRect(0, 0, tl.width, tl.height);
+  if (!doc) return;
+  const xw = tl.width / n;
+  doc.tracks.forEach((t, li) => {
+    const y = li * laneH + 2;
+    tctx.fillStyle = stateColors.unreviewed;
+    tctx.fillRect(0, y, tl.width, laneH - 1);
+    for (const [k, fr] of Object.entries(doc.frames)) {
+      const rec = fr.tracks && fr.tracks[String(t.id)];
+      if (!rec) continue;
+      tctx.fillStyle = stateColors[rec.state] || "#555";
+      tctx.fillRect(+k * xw, y, Math.max(xw, 1), laneH - 1);
+    }
+  });
+  for (const [k, fr] of Object.entries(doc.frames)) {
+    if (fr.bad) {
+      tctx.fillStyle = "rgba(0,0,0,.75)";
+      tctx.fillRect(+k * xw, 0, Math.max(xw, 1), tl.height);
+    }
+  }
+  tctx.fillStyle = "#fff";
+  tctx.fillRect(cur.frame * xw - 1, 0, 2, tl.height);
+}
+tl.addEventListener("pointerdown", ev => {
+  const seekTo = e2 => {
+    const r = tl.getBoundingClientRect();
+    const f = Math.round((e2.clientX - r.left) / r.width * (manifest.video.nframes - 1));
+    gotoFrame(clamp(f, 0, manifest.video.nframes - 1));
+  };
+  seekTo(ev);
+  const mv = e2 => seekTo(e2);
+  const up = () => { window.removeEventListener("pointermove", mv);
+                     window.removeEventListener("pointerup", up); };
+  window.addEventListener("pointermove", mv);
+  window.addEventListener("pointerup", up);
+});
+
+/* ============================ canvas interaction ========================= */
+let drag = null;   // {kind, ...}
+let spaceDown = false;
+cv.addEventListener("wheel", ev => {
+  ev.preventDefault();
+  const factor = Math.exp(-ev.deltaY * 0.0015);
+  const [mx, my] = [ev.offsetX * devicePixelRatio, ev.offsetY * devicePixelRatio];
+  const nz = clamp(view.zoom * factor, 0.2, 40);
+  view.panX = mx - (mx - view.panX) * nz / view.zoom;
+  view.panY = my - (my - view.panY) * nz / view.zoom;
+  view.zoom = nz;
+  render();
+}, { passive: false });
+function hitRegion(ix, iy) {
+  /* inside the active outline = grab to move it; drawing a new outline must
+     start outside the old one (that replaces it) */
+  const { poly } = activeRegion();
+  if (!poly || poly.length < 6) return null;
+  return pointInPoly(ix, iy, poly) ? { kind: "move" } : null;
+}
+function editingPending() {
+  /* all geometry/paint edits go to the transient preview; touching a stored
+     accepted record clones it into the preview first (the stored record is
+     untouched until re-accepted) */
+  let p = pendingActive();
+  if (p) return p;
+  const rec = activeRec();
+  if (rec && rec.state === "accepted") {
+    toast("editing accepted frame — press A to re-accept, Z to discard");
+    return clonePendingFromRec(rec);
+  }
+  return null;
+}
+cv.addEventListener("pointerdown", ev => {
+  cv.setPointerCapture(ev.pointerId);
+  const [ix, iy] = canvasToImg(ev.offsetX * devicePixelRatio, ev.offsetY * devicePixelRatio);
+  if (spaceDown || ev.button === 1) {
+    drag = { kind: "pan", sx: ev.offsetX, sy: ev.offsetY,
+             px: view.panX, py: view.panY };
+    return;
+  }
+  const snapPending = () => pending ? JSON.parse(JSON.stringify(pending)) : null;
+  if (cur.tool === "brush" || cur.tool === "erase") {
+    if (cur.trackId == null) { toast("select a track first", "warn"); return; }
+    const rec0 = activeRec();
+    if (rec0 && rec0.state === "absent") {
+      toast("frame is marked absent — Clear (⌫) it first", "warn");
+      return;
+    }
+    const prev = snapPending();   // BEFORE clone/create: cancel restores pre-stroke state
+    let p = editingPending();
+    if (!p) {
+      if (cur.tool === "erase") { toast("nothing to erase here", "warn"); return; }
+      p = pending = { frame: cur.frame, tid: cur.trackId };
+    }
+    drag = { kind: "paint", add: cur.tool === "brush", prev };
+    paintAt(ix, iy, drag.add);
+    return;
+  }
+  const hit = hitRegion(ix, iy);
+  if (hit) {
+    const prev = snapPending();
+    const p = editingPending();
+    if (!p || !p.poly) return;
+    drag = { kind: "movepoly", start: p.poly.slice(), sx: ix, sy: iy,
+             changed: false, prev };
+    return;
+  }
+  if (cur.tool === "draw") {
+    if (cur.trackId == null) { toast("create a track first (N)", "warn"); return; }
+    const rec = activeRec();
+    if (rec && rec.state === "absent") {
+      toast("frame is marked absent — Clear (⌫) it first", "warn");
+      return;
+    }
+    const prev = snapPending();
+    pending = { frame: cur.frame, tid: cur.trackId, poly: [ix, iy] };
+    drag = { kind: "lasso", prev, lx: ix, ly: iy };
+    invalidateMasks();
+    render();
+  }
+});
+function finishLasso() {
+  /* close the traced loop; a stray click or tiny scribble restores whatever
+     was there before instead of becoming a degenerate region */
+  const p = pendingActive();
+  const prev = drag.prev;
+  drag = null;
+  if (!p || !p.poly) return;
+  if (p.poly.length < 8 || polyArea(p.poly) < 12) {
+    pending = prev;
+    toast("hold the button and trace around the form; release to close", "warn");
+    invalidateMasks();
+    return;
+  }
+  p.poly = simplifyPath(p.poly, 1.2);
+}
+function cancelDrag() {
+  /* Escape / pointercancel must revert the drag's mutations, not just stop
+     tracking — a half-drawn outline or half-painted stroke would otherwise
+     linger and could be accepted */
+  if (!drag) return;
+  if ("prev" in drag) pending = drag.prev;
+  drag = null;
+  invalidateMasks();
+  renderTracks();
+  render();
+}
+cv.addEventListener("pointermove", ev => {
+  const [ix, iy] = canvasToImg(ev.offsetX * devicePixelRatio, ev.offsetY * devicePixelRatio);
+  if (!drag) return;
+  if (drag.kind === "pan") {
+    view.panX = drag.px + (ev.offsetX - drag.sx) * devicePixelRatio;
+    view.panY = drag.py + (ev.offsetY - drag.sy) * devicePixelRatio;
+    render();
+    return;
+  }
+  if (drag.kind === "paint") { paintAt(ix, iy, drag.add); return; }
+  const p = pendingActive();
+  if (!p || !p.poly) return;
+  if (drag.kind === "lasso") {
+    if (Math.hypot(ix - drag.lx, iy - drag.ly) >= 1.5) {
+      p.poly.push(ix, iy);
+      drag.lx = ix; drag.ly = iy;
+      render();
+    }
+    return;
+  }
+  if (drag.kind === "movepoly") {
+    if (!drag.changed) delete p.rle;   // geometry changed: old mask invalid
+    drag.changed = true;
+    const dx = ix - drag.sx, dy = iy - drag.sy;
+    const st = drag.start;
+    for (let i = 0; i < st.length; i += 2) {
+      p.poly[i] = st[i] + dx;
+      p.poly[i + 1] = st[i + 1] + dy;
+    }
+    render();
+  }
+});
+cv.addEventListener("pointercancel", cancelDrag);
+cv.addEventListener("pointerup", () => {
+  if (drag && drag.kind === "lasso") finishLasso();
+  drag = null;
+  renderTracks();
+  render();
+});
+function paintAt(ix, iy, add) {
+  const p = pendingActive();
+  if (!p) return;
+  let mask;
+  if (p.rle) mask = rleDecode(p.rle).mask;
+  else if (add) mask = new Uint8Array(FW * FH);
+  else return;
+  const r = +$("brush").value;
+  const sky = manifest.sky;
+  const x0 = clamp(Math.floor(ix - r), 0, FW - 1), x1 = clamp(Math.ceil(ix + r), 0, FW - 1);
+  const y0 = clamp(Math.floor(iy - r), 0, FH - 1), y1 = clamp(Math.ceil(iy + r), 0, FH - 1);
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    if ((x - ix) ** 2 + (y - iy) ** 2 > r * r) continue;
+    if (add) {
+      const dxs = x - sky.cx, dys = y - sky.cy;
+      if (dxs * dxs + dys * dys > sky.r * sky.r) continue;
+    }
+    mask[y * FW + x] = add ? 1 : 0;
+  }
+  p.rle = rleEncode(mask, FW, FH);
+  p.provenance = { ...(p.provenance || { method: "brush", algo_version: SNAP_ALGO_VERSION }),
+                   brush_edited: true };
+  render();
+}
+
+/* ================================== nav ================================== */
+function gotoFrame(f) {
+  const nf = clamp(f, 0, manifest.video.nframes - 1);
+  if (nf !== cur.frame) discardPending();   // previews never survive navigation
+  cur.frame = nf;
+  invalidateMasks();
+  renderTracks();
+  render();
+  saveSession();
+}
+$("prevb").onclick = () => gotoFrame(cur.frame - +($("stride").value || 1));
+$("nextb").onclick = () => gotoFrame(cur.frame + +($("stride").value || 1));
+$("seek").oninput = () => gotoFrame(+$("seek").value);
+$("goto").onchange = () => {
+  const f = parseInt($("goto").value, 10);
+  if (!isNaN(f)) gotoFrame(f);
+  $("goto").value = "";
+};
+
+/* ================================= keys ================================= */
+window.addEventListener("keydown", ev => {
+  if (ev.target.tagName === "INPUT" || ev.target.tagName === "SELECT" ||
+      ev.target.tagName === "TEXTAREA") return;
+  if ($("annotate").style.display !== "flex") return;
+  if (drag && ev.key !== "Escape" && ev.key !== " ") {
+    /* frame/track/state changes mid-drag would corrupt the record being
+       drawn — a stray A while brushing must not accept-and-advance */
+    ev.preventDefault();
+    return;
+  }
+  const st = ev.shiftKey ? 10 : +($("stride").value || 1);
+  switch (ev.key) {
+    case "ArrowLeft": gotoFrame(cur.frame - st); ev.preventDefault(); break;
+    case "ArrowRight": gotoFrame(cur.frame + st); ev.preventDefault(); break;
+    case "Home": gotoFrame(0); break;
+    case "End": gotoFrame(manifest.video.nframes - 1); break;
+    case "a": case "A": acceptCurrent(); break;
+    case "v": case "V": markAbsent(); break;
+    case "p": case "P": previewFromNearest(); break;
+    case "s": case "S": runSnap(); break;
+    case "e": case "E": setTool("draw"); break;
+    case "b": case "B": setTool("brush"); break;
+    case "x": case "X": setTool("erase"); break;
+    case "q": case "Q": toggleBad(); break;
+    case "n": case "N": newTrack(); break;
+    case "z": case "Z": doUndo(false); break;
+    case "y": case "Y": doUndo(true); break;
+    case "o": case "O": {
+      const o = $("opacity");
+      o.value = (+o.value + 0.25) % 1.25 > 1 ? 0 : ((+o.value + 0.25) % 1.25);
+      render();
+      break;
+    }
+    case "[": $("brush").value = Math.max(2, +$("brush").value - 2); syncLabels(); break;
+    case "]": $("brush").value = Math.min(40, +$("brush").value + 2); syncLabels(); break;
+    case "h": case "H": if (!hidden) { hidden = true; render(); } break;
+    case "d": case "D": {
+      const vmEl = $("viewmode");
+      const order = ["original", "enhanced"];
+      vmEl.value = order[(order.indexOf(vmEl.value) + 1) % order.length];
+      toast("view: " + vmEl.options[vmEl.selectedIndex].text);
+      render();
+      break;
+    }
+    case "g": case "G": $("goto").focus(); ev.preventDefault(); break;
+    case "Backspace": clearRec(); ev.preventDefault(); break;
+    case "?": $("help").style.display = "block"; break;
+    case "Escape":
+      if (drag) cancelDrag();
+      else $("help").style.display = "none";
+      break;
+    case " ": spaceDown = true; cv.style.cursor = "grab"; ev.preventDefault(); break;
+    default:
+      if (/^[1-9]$/.test(ev.key)) {
+        const t = doc.tracks[+ev.key - 1];
+        if (t) {
+          if (t.id !== cur.trackId) discardPending();
+          cur.trackId = t.id; renderTracks(); render(); saveSession();
+        }
+      }
+  }
+});
+window.addEventListener("keyup", ev => {
+  if (ev.key === " ") { spaceDown = false; cv.style.cursor = "crosshair"; }
+  if (ev.key === "h" || ev.key === "H") { hidden = false; render(); }
+});
+function setTool(t) {
+  cur.tool = t;
+  for (const id of ["tool-draw", "tool-brush", "tool-erase"]) {
+    $(id).style.borderColor = "";
+  }
+  $("tool-" + (t === "erase" ? "erase" : t === "brush" ? "brush" : "draw"))
+    .style.borderColor = "var(--accent)";
+}
+
+/* ================================ export ================================ */
+$("exportbtn").onclick = async () => {
+  if (pending) {
+    toast(`finish the preview on frame ${pending.frame} first — Accept (A) ` +
+          "or discard (Z); export must not run over an unfinished edit", "warn");
+    gotoFrame(pending.frame);
+    return;
+  }
+  const settled = await saveSettled();
+  if (!settled) { toast("cannot export: unsaved changes failed to save", "err"); return; }
+  if (pending) {   // re-check: a preview may have been created during the await
+    toast(`finish the preview on frame ${pending.frame} first — Accept (A) ` +
+          "or discard (Z)", "warn");
+    gotoFrame(pending.frame);
+    return;
+  }
+  const dlg = $("exportdlg");
+  dlg.innerHTML = "<h3>Exporting…</h3><p>validating and writing artifacts</p>";
+  dlg.showModal();
+  try {
+    await api(`/api/export?name=${projName}`, { method: "POST" });
+  } catch (e) {
+    dlg.innerHTML = `<h3>Export failed to start</h3><p>${e.message}</p>
+      <button onclick="this.closest('dialog').close()">Close</button>`;
+    return;
+  }
+  const poll = setInterval(async () => {
+    const s = await api(`/api/export_status?name=${projName}`);
+    if (!s.finished) {
+      dlg.innerHTML = `<h3>Exporting…</h3><p>${s.phase} ${s.done || ""}${s.total ? "/" + s.total : ""}</p>`;
+      return;
+    }
+    clearInterval(poll);
+    if (s.error) {
+      dlg.innerHTML = `<h3 style="color:var(--err)">Export failed</h3>
+        <p style="white-space:pre-wrap">${s.error}</p>
+        <p>Nothing was exported (fail-closed). Finish reviewing, then retry.</p>
+        <button onclick="this.closest('dialog').close()">Close</button>`;
+    } else {
+      const r = s.report;
+      dlg.innerHTML = `<h3 style="color:var(--ok)">Export complete</h3>
+        <p class="mono" style="font-size:12px">${s.out_dir}</p>
+        <p class="mono" style="font-size:11px;color:var(--dim)">annotations rev ${r.annotations_rev || "?"}</p>
+        <p>${r.frames_fully_reviewed} / ${r.frames_total} frames fully reviewed and exported.</p>
+        <ul style="margin:8px 0 8px 18px">` +
+        r.checks.map(c => `<li>${c.ok ? "&#9989;" : "&#10060;"} ${c.check}</li>`).join("") +
+        `</ul>` +
+        (r.warnings.length ? `<p style="color:var(--warn)">${r.warnings.join("<br>")}</p>` : "") +
+        `<button onclick="this.closest('dialog').close()">Close</button>`;
+    }
+  }, 700);
+};
+
+/* ---------------------------- track lifecycle ---------------------------- */
+$("ev-start").onclick = () => lifecycleMark("starts");
+$("ev-end").onclick = () => lifecycleMark("ends");
+
+/* ============================== home screen ============================== */
+async function refreshHome() {
+  try {
+    const h = await api("/api/health");
+    if (!h.ok) {
+      $("health").style.display = "block";
+      $("health").innerHTML = `<b style="color:var(--err)">FFmpeg not found.</b>
+        ${h.ffmpeg_version}<br>Annotating existing projects still works.`;
+    } else if (h.disk_free_gb < 5) {
+      $("health").style.display = "block";
+      $("health").innerHTML = `<b style="color:var(--warn)">Low disk:</b>
+        ${h.disk_free_gb} GB free — preparing a new clip needs ~2 GB.`;
+    }
+  } catch (e) { /* server gone */ }
+  const pj = await api("/api/projects");
+  const el = $("projlist");
+  if (!pj.projects.length) { el.textContent = "none yet — add a video above"; }
+  else {
+    el.innerHTML = "";
+    for (const p of pj.projects) {
+      const d = document.createElement("div");
+      d.className = "row";
+      d.style.margin = "6px 0";
+      let info = "";
+      if (p.prepared) {
+        const sc = p.state_counts || {};
+        info = `${p.nframes} frames · ${p.tracks} tracks · ` +
+          `${sc.accepted || 0} accepted / ${sc.absent || 0} absent`;
+        const tm = p.timing_methods || {};
+        if ((tm.interp || 0) + (tm.nominal || 0) > 0) {
+          info += ` · <span style="color:var(--warn)">${(tm.interp||0)+(tm.nominal||0)} frames w/o OCR time</span>`;
+        }
+      } else if (p.preparing) {
+        info = `preparing: ${p.preparing.phase} ${p.preparing.done}${p.preparing.total ? "/" + p.preparing.total : ""}`;
+      } else if (p.prepare_error) {
+        info = `<span style="color:var(--err)">prepare failed: ${p.prepare_error}</span>`;
+      }
+      d.innerHTML = `<b class="mono">${p.name}</b>
+        <span class="grow" style="color:var(--dim);font-size:12.5px">${info}</span>`;
+      const b = document.createElement("button");
+      b.textContent = p.prepared ? "Annotate" : "…";
+      b.disabled = !p.prepared;
+      b.onclick = () => openProject(p.name);
+      d.appendChild(b);
+      el.appendChild(d);
+    }
+  }
+  const sv = await api("/api/scan_videos");
+  const sl = $("scanlist");
+  if (sv.videos.length) {
+    sl.innerHTML = `<div style="color:var(--dim);margin:6px 0 2px">
+      Videos found next to this package:</div>`;
+    for (const v of sv.videos) {
+      const d = document.createElement("div");
+      d.className = "row";
+      d.style.margin = "4px 0";
+      d.innerHTML = `<span class="mono grow">${v.name}
+        <span style="color:var(--dim)">(${(v.bytes / 1048576).toFixed(0)} MB)</span></span>`;
+      const b = document.createElement("button");
+      b.textContent = "Prepare";
+      b.onclick = () => importVideo(v);
+      d.appendChild(b);
+      sl.appendChild(d);
+    }
+  }
+}
+function suggestName(fn) {
+  return fn.replace(/\.[^.]+$/, "").replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 60);
+}
+async function importVideo(v) {
+  const name = prompt("Project name", suggestName(v.name));
+  if (!name) return;
+  try {
+    await api(`/api/import?name=${encodeURIComponent(name)}`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ video_id: v.id }) });
+    watchPrepare(name);
+  } catch (e) { alert("import failed: " + e.message); }
+}
+async function uploadFile(file) {
+  const name = prompt("Project name", suggestName(file.name));
+  if (!name) return;
+  $("prepprog").style.display = "block";
+  $("preptext").textContent = `uploading ${file.name}…`;
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", `/api/upload?name=${encodeURIComponent(name)}&filename=${encodeURIComponent(file.name)}`);
+  xhr.upload.onprogress = e => {
+    if (e.lengthComputable) $("prepbar").value = e.loaded / e.total * 100;
+  };
+  xhr.onload = () => {
+    if (xhr.status === 200) watchPrepare(name);
+    else {
+      let msg = xhr.responseText;
+      try { msg = JSON.parse(xhr.responseText).error; } catch (e) {}
+      $("preptext").innerHTML = `<span style="color:var(--err)">upload failed: ${msg}</span>`;
+    }
+  };
+  xhr.onerror = () => { $("preptext").textContent = "upload failed (network)"; };
+  xhr.send(file);
+}
+function watchPrepare(name) {
+  $("prepprog").style.display = "block";
+  const iv = setInterval(async () => {
+    let s;
+    try { s = await api(`/api/prepare_status?name=${name}`); }
+    catch (e) { return; }
+    if (s.error) {
+      clearInterval(iv);
+      $("preptext").innerHTML = `<span style="color:var(--err)">prepare failed: ${s.error}</span>`;
+      refreshHome();
+      return;
+    }
+    const pct = s.total ? (s.done / s.total * 100) : 0;
+    $("prepbar").value = pct;
+    $("preptext").textContent = `${name}: ${s.phase} ${s.done || ""}${s.total ? " / " + s.total : ""}`;
+    if (s.finished) {
+      clearInterval(iv);
+      $("preptext").textContent = `${name}: ready`;
+      refreshHome();
+    }
+  }, 800);
+}
+$("pickbtn").onclick = () => $("filepick").click();
+$("filepick").onchange = () => {
+  if ($("filepick").files[0]) uploadFile($("filepick").files[0]);
+};
+const dropEl = $("drop");
+dropEl.addEventListener("dragover", e => { e.preventDefault(); dropEl.classList.add("over"); });
+dropEl.addEventListener("dragleave", () => dropEl.classList.remove("over"));
+dropEl.addEventListener("drop", e => {
+  e.preventDefault();
+  dropEl.classList.remove("over");
+  if (e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]);
+});
+
+/* ============================= project open ============================= */
+/* -------- session memory: reopen exactly where the annotator left off ---- */
+function sessKey() { return "pmaf_sess_" + projName; }
+function saveSession() {
+  if (!projName) return;
+  try {
+    localStorage.setItem(sessKey(), JSON.stringify({
+      frame: cur.frame, trackId: cur.trackId,
+      view: $("viewmode").value, hi: $("hi").value,
+      opacity: $("opacity").value, stride: $("stride").value,
+      brush: $("brush").value }));
+    localStorage.setItem("pmaf_last_project", projName);
+  } catch (e) { /* storage full/blocked: session memory only */ }
+}
+
+async function openProject(name) {
+  /* fetch into locals first: a slower earlier open must never interleave
+     its globals with a later one (mixed doc/images across projects) */
+  const myGen = ++projectGen;   // also cancels pending image-load callbacks
+  const mf = await api(`/p/${name}/manifest.json`);
+  const a = await api(`/api/annotations?name=${name}`);
+  if (myGen !== projectGen) return;   // superseded by a newer open
+  projName = name;
+  manifest = mf;
+  FW = manifest.video.width;
+  FH = manifest.video.height;
+  doc = a.doc;
+  dirty = new Set(); tracksDirty = false;
+  discardPending();
+  undoStacks = new Map(); imgCache.clear(); invalidateMasks();
+  enhCache = { frame: -1, canvas: null };
+  /* migrate docs from the pre-simplification schema: proposal/edited were
+     unconfirmed machine output and are transient now — drop them */
+  let migrated = 0;
+  for (const [k, fr] of Object.entries(doc.frames)) {
+    for (const [tid, rec] of Object.entries(fr.tracks || {})) {
+      if (rec.state === "proposal" || rec.state === "edited") {
+        delete fr.tracks[tid];
+        migrated++;
+        dirty.add(+k);
+      }
+    }
+    if (fr.tracks && !Object.keys(fr.tracks).length && !fr.bad) {
+      delete doc.frames[k];
+    }
+  }
+  if (migrated) scheduleSave();
+  cur = { frame: 0, trackId: doc.tracks.length ? doc.tracks[0].id : null, tool: "draw" };
+  /* restore where the annotator left off */
+  let sess = null;
+  try { sess = JSON.parse(localStorage.getItem(sessKey()) || "null"); }
+  catch (e) { /* storage disabled or corrupt entry */ }
+  if (sess) {
+    cur.frame = clamp(+sess.frame || 0, 0, manifest.video.nframes - 1);
+    if (doc.tracks.some(t => t.id === sess.trackId)) cur.trackId = sess.trackId;
+    if (["original", "enhanced"].includes(sess.view))
+      $("viewmode").value = sess.view;   // legacy "difference" falls to default
+    for (const [id, v] of [["hi", sess.hi], ["opacity", sess.opacity],
+                           ["brush", sess.brush]]) {
+      if (v != null) $(id).value = v;
+    }
+    if (["1", "2", "5", "10"].includes(String(sess.stride)))
+      $("stride").value = sess.stride;
+    syncLabels();
+  }
+  view.fitted = false;
+  $("home").style.display = "none";
+  $("annotate").style.display = "flex";
+  $("projname").textContent = name;
+  $("seek").max = manifest.video.nframes - 1;
+  /* backgrounds */
+  bgImages = [];
+  const segs = manifest.backgrounds.segments;
+  const myBg = bgImages;
+  await Promise.all(segs.map((s, i) => new Promise(res => {
+    const im = new Image();
+    im.onload = () => {
+      if (myGen !== projectGen) { res(); return; }   // superseded mid-load
+      const oc = new OffscreenCanvas(FW, FH);
+      const o = oc.getContext("2d", { willReadFrequently: true });
+      o.drawImage(im, 0, 0);
+      myBg[i] = o.getImageData(0, 0, FW, FH);
+      res();
+    };
+    im.onerror = res;
+    im.src = `/p/${name}/backgrounds/${s.file}`;
+  })));
+  if (myGen !== projectGen) return;
+  setTool("draw");
+  renderTracks();
+  render();
+  saveSession();
+  if (migrated) {
+    toast(`${migrated} unconfirmed machine proposals from the previous ` +
+          "version were discarded — annotations are now only Accepted or Absent");
+  }
+  if (!doc.tracks.length) {
+    toast("Press N to create your first PMAF track, then circle around it " +
+          "(hold the mouse button and trace)");
+  }
+}
+$("backbtn").onclick = async () => {
+  const ok = await saveSettled();
+  if (!ok) {
+    toast("cannot leave: unsaved changes failed to save — check the " +
+          "indicator (a conflict needs a reload)", "err");
+    return;
+  }
+  try { localStorage.removeItem("pmaf_last_project"); } catch (e) {}  // deliberate exit: no auto-reopen
+  $("annotate").style.display = "none";
+  $("home").style.display = "block";
+  refreshHome();
+};
+
+/* -------------------------------- wiring -------------------------------- */
+$("tool-draw").onclick = () => setTool("draw");
+$("tool-brush").onclick = () => setTool("brush");
+$("tool-erase").onclick = () => setTool("erase");
+$("snapbtn").onclick = runSnap;
+$("acceptbtn").onclick = acceptCurrent;
+$("absentbtn").onclick = markAbsent;
+$("clearbtn").onclick = clearRec;
+$("badbtn").onclick = toggleBad;
+$("deltrack").onclick = deleteTrack;
+$("newtrack").onclick = newTrack;
+$("helpbtn").onclick = () => $("help").style.display = "block";
+function syncLabels() {
+  $("hival").textContent = (+$("hi").value).toFixed(2);
+  $("brval").textContent = $("brush").value;
+}
+let resnapTimer = null;
+$("hi").oninput = () => {
+  syncLabels();
+  /* live re-snap: moving the threshold updates the preview mask directly */
+  clearTimeout(resnapTimer);
+  resnapTimer = setTimeout(() => {
+    const p = pendingActive();
+    if (p && p.poly) runSnap();
+  }, 160);
+  saveSession();
+};
+$("brush").oninput = syncLabels;
+$("opacity").oninput = () => { render(); saveSession(); };
+$("viewmode").oninput = () => { render(); saveSession(); };
+$("stride").oninput = () => saveSession();
+window.addEventListener("resize", () => { view.fitted = false; render(); });
+syncLabels();
+(async () => {
+  await refreshHome();
+  /* relaunch restores the annotator exactly where it left off */
+  let last = null;
+  try { last = localStorage.getItem("pmaf_last_project"); }
+  catch (e) { /* storage disabled: home screen */ }
+  if (last) {
+    try {
+      const pj = await api("/api/projects");
+      const p = pj.projects.find(x => x.name === last && x.prepared);
+      if (p) await openProject(last);
+    } catch (e) { /* stay on home screen */ }
+  }
+})();
+setInterval(() => {
+  if ($("home").style.display !== "none") refreshHome();
+}, 5000);
+</script>
+</body>
+</html>
